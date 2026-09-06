@@ -1,0 +1,125 @@
+// Prisma Schema for FloodVision Platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String         @id @default(uuid())
+  name         String
+  email        String         @unique
+  passwordHash String
+  role         String         @default("USER") // USER or ADMIN
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  locations    Location[]
+  notifications Notification[]
+}
+
+model Location {
+  id         String      @id @default(uuid())
+  userId     String
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  latitude   Float
+  longitude  Float
+  city       String?
+  state      String?
+  country    String?
+  isHome     Boolean     @default(false)
+  createdAt  DateTime    @default(now())
+  floodRisks FloodRisk[]
+}
+
+model FloodRisk {
+  id           String    @id @default(uuid())
+  locationId   String?
+  location     Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  latitude     Float
+  longitude    Float
+  riskScore    Float     // 0 - 100
+  probability  Float     // 0.0 - 1.0
+  riskLevel    String    // LOW, MODERATE, HIGH, CRITICAL
+  confidence   Float     // 0.0 - 1.0
+  rainfall     Float     // mm
+  waterLevel   Float     // meters
+  temperature  Float     // °C
+  humidity     Float?    // %
+  soilMoisture Float?    // %
+  createdAt    DateTime  @default(now())
+}
+
+model FloodAlert {
+  id            String         @id @default(uuid())
+  title         String
+  description   String
+  severity      String         // INFO, WARNING, DANGER, CRITICAL
+  latitude      Float
+  longitude     Float
+  radiusKm      Float          @default(10.0)
+  affectedArea  String
+  expiresAt     DateTime
+  createdAt     DateTime       @default(now())
+  notifications Notification[]
+}
+
+model Notification {
+  id        String     @id @default(uuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  alertId   String
+  alert     FloodAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  read      Boolean    @default(false)
+  createdAt DateTime   @default(now())
+}
+
+model WeatherData {
+  id          String   @id @default(uuid())
+  latitude    Float
+  longitude   Float
+  temperature Float
+  humidity    Float
+  rainfall    Float
+  windSpeed   Float
+  condition   String
+  timestamp   DateTime @default(now())
+}
+
+model FloodEvent {
+  id          String   @id @default(uuid())
+  location    String
+  latitude    Float
+  longitude   Float
+  severity    String   // LOW, MODERATE, HIGH, CRITICAL
+  description String
+  impact      String?
+  date        DateTime
+  createdAt   DateTime @default(now())
+}
+
+model MonitoringStation {
+  id            String   @id @default(uuid())
+  name          String
+  latitude      Float
+  longitude     Float
+  waterLevel    Float    // in meters
+  warningLevel  Float    // threshold for alert
+  criticalLevel Float    // threshold for critical
+  status        String   // OPERATIONAL, WARNING, CRITICAL, OFFLINE
+  lastUpdated   DateTime @default(now())
+}
+
+model ContactMessage {
+  id        String   @id @default(uuid())
+  name      String
+  email     String
+  subject   String?
+  message   String
+  status    String   @default("PENDING") // PENDING, RESOLVED
+  createdAt DateTime @default(now())
+}

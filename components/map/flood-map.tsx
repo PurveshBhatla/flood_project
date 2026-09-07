@@ -11,24 +11,26 @@ import {
   useMap
 } from 'react-leaflet';
 import L from 'leaflet';
-import { getDepthColor, getRiskLevelColor } from '@/lib/utils';
+import {
+  getDepthColor,
+  getRiskLevelColor,
+  classifyRainfallIntensity,
+  formatDate,
+  RAINFALL_THRESHOLDS
+} from '@/lib/utils';
 import {
   Search,
-  Navigation,
   Layers,
-  AlertTriangle,
-  Droplets,
-  ShieldAlert,
-  Thermometer,
+  CloudRain,
   Play,
   Pause,
-  RotateCcw,
   Route,
-  Activity,
   Info,
   Sliders,
   CheckCircle2,
-  X
+  X,
+  RefreshCw,
+  Check
 } from 'lucide-react';
 
 const customIcon = (color: string) =>
@@ -79,7 +81,8 @@ export default function FloodMap() {
   const [routeResult, setRouteResult] = useState<any>(null);
   const [loadingRoute, setLoadingRoute] = useState(false);
 
-  // Layer Toggles
+  // Layer Control Menu State
+  const [showLayerMenu, setShowLayerMenu] = useState(false);
   const [layers, setLayers] = useState({
     streetRisk: true,
     waterDepth: true,
@@ -90,7 +93,65 @@ export default function FloodMap() {
     safeRoute: true,
   });
 
+  // Live Rainfall Layer State
+  const [rainfallData, setRainfallData] = useState<{
+    mode: 'live' | 'demo';
+    updatedAt: string;
+    areas: Array<{
+      lat: number;
+      lng: number;
+      rainfallMmPerHour: number;
+      category: 'LOW' | 'MODERATE' | 'EXTREME';
+      locationName: string;
+      timestamp: string;
+    }>;
+  }>({
+    mode: 'demo',
+    updatedAt: new Date().toISOString(),
+    areas: [],
+  });
+
+  const [lastRainFetchTime, setLastRainFetchTime] = useState<number>(Date.now());
+  const [secondsAgo, setSecondsAgo] = useState(0);
+
   const timelineSteps = [0, 30, 60, 90, 120, 150, 180];
+
+  // Configurable Refresh Interval for Live Rainfall Layer
+  const rainRefreshInterval = parseInt(
+    process.env.NEXT_PUBLIC_RAIN_REFRESH_INTERVAL || '30000',
+    10
+  );
+
+  const fetchRainfallData = async () => {
+    try {
+      const res = await fetch(`/api/rainfall/current?lat=${center[0]}&lng=${center[1]}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.areas) {
+        setRainfallData(data);
+        setLastRainFetchTime(Date.now());
+      }
+    } catch (err) {
+      console.error('Rainfall layer fetch error:', err);
+    }
+  };
+
+  // Fetch live rainfall on load & auto-refresh cleanly without flickering map canvas
+  useEffect(() => {
+    fetchRainfallData();
+    const timer = setInterval(() => {
+      fetchRainfallData();
+    }, rainRefreshInterval);
+    return () => clearInterval(timer);
+  }, [center]);
+
+  // Second ticker for legend "Last updated: X s ago"
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSecondsAgo(Math.floor((Date.now() - lastRainFetchTime) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [lastRainFetchTime]);
 
   // Fetch Street Risk GeoJSON when forecastMinutes or center changes
   const fetchStreetGeoJson = async (min: number) => {
@@ -203,6 +264,72 @@ export default function FloodMap() {
           </button>
         </form>
 
+        {/* Map Layer Toggle Menu */}
+        <div className="relative">
+          <button
+            onClick={() => setShowLayerMenu(!showLayerMenu)}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-background/95 backdrop-blur-md border border-border hover:bg-muted text-foreground text-xs font-semibold rounded-xl shadow transition-colors"
+          >
+            <Layers className="h-4 w-4 text-brand-600" />
+            Map Layers
+          </button>
+
+          {showLayerMenu && (
+            <div className="absolute top-11 right-0 w-56 bg-background/95 backdrop-blur-md border border-border rounded-xl p-3 shadow-2xl z-[500] space-y-2">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block border-b border-border pb-1">
+                Map Layer Overlay Toggles
+              </span>
+              <label className="flex items-center justify-between text-xs cursor-pointer hover:bg-muted/50 p-1 rounded">
+                <span className="flex items-center gap-2 font-medium">
+                  <CloudRain className="h-3.5 w-3.5 text-blue-500" /> Live Rainfall Layer
+                </span>
+                <input
+                  type="checkbox"
+                  checked={layers.rainfall}
+                  onChange={(e) => setLayers({ ...layers, rainfall: e.target.checked })}
+                  className="rounded accent-brand-600"
+                />
+              </label>
+
+              <label className="flex items-center justify-between text-xs cursor-pointer hover:bg-muted/50 p-1 rounded">
+                <span className="flex items-center gap-2 font-medium">
+                  <Sliders className="h-3.5 w-3.5 text-red-500" /> Street Flood Inundation
+                </span>
+                <input
+                  type="checkbox"
+                  checked={layers.streetRisk}
+                  onChange={(e) => setLayers({ ...layers, streetRisk: e.target.checked })}
+                  className="rounded accent-brand-600"
+                />
+              </label>
+
+              <label className="flex items-center justify-between text-xs cursor-pointer hover:bg-muted/50 p-1 rounded">
+                <span className="flex items-center gap-2 font-medium">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> River Stations
+                </span>
+                <input
+                  type="checkbox"
+                  checked={layers.stations}
+                  onChange={(e) => setLayers({ ...layers, stations: e.target.checked })}
+                  className="rounded accent-brand-600"
+                />
+              </label>
+
+              <label className="flex items-center justify-between text-xs cursor-pointer hover:bg-muted/50 p-1 rounded">
+                <span className="flex items-center gap-2 font-medium">
+                  <Route className="h-3.5 w-3.5 text-brand-600" /> Safe Route Overlay
+                </span>
+                <input
+                  type="checkbox"
+                  checked={layers.safeRoute}
+                  onChange={(e) => setLayers({ ...layers, safeRoute: e.target.checked })}
+                  className="rounded accent-brand-600"
+                />
+              </label>
+            </div>
+          )}
+        </div>
+
         {/* Judge Demo Scenario Launcher */}
         <button
           onClick={() => setIsSimulating(!isSimulating)}
@@ -272,8 +399,58 @@ export default function FloodMap() {
         </div>
       </div>
 
+      {/* LIVE RAINFALL LEGEND PANEL */}
+      {layers.rainfall && (
+        <div className="absolute top-20 right-4 z-[400] bg-background/95 backdrop-blur-md border border-border rounded-xl p-3 shadow-xl space-y-2 text-xs hidden sm:block w-52">
+          <div className="flex items-center justify-between border-b border-border pb-1.5">
+            <span className="font-extrabold text-foreground flex items-center gap-1.5 text-[11px] uppercase tracking-wider">
+              <CloudRain className="h-3.5 w-3.5 text-blue-500" /> Live Rainfall
+            </span>
+            <span
+              className={`px-2 py-0.5 rounded text-[9px] font-extrabold tracking-wide uppercase ${
+                rainfallData.mode === 'live'
+                  ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/40'
+                  : 'bg-amber-500/20 text-amber-600 border border-amber-500/40'
+              }`}
+            >
+              {rainfallData.mode === 'live' ? 'LIVE DATA' : 'DEMO DATA'}
+            </span>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-[#10b981]"></span> Green (Low)
+              </span>
+              <span className="font-bold text-muted-foreground">0–10 mm/h</span>
+            </div>
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-[#f59e0b]"></span> Yellow (Moderate)
+              </span>
+              <span className="font-bold text-muted-foreground">10–25 mm/h</span>
+            </div>
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-[#ef4444]"></span> Red (Extreme)
+              </span>
+              <span className="font-bold text-muted-foreground">25+ mm/h</span>
+            </div>
+          </div>
+
+          <div className="text-[10px] text-muted-foreground border-t border-border/60 pt-1.5 flex items-center justify-between">
+            <span className="flex items-center gap-1">
+              <RefreshCw className="h-3 w-3 text-muted-foreground animate-spin-slow" /> Last updated:
+            </span>
+            <span className="font-extrabold text-foreground">
+              {secondsAgo < 60 ? `${secondsAgo}s ago` : `${Math.floor(secondsAgo / 60)}m ago`}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* FLOOD DEPTH LEGEND PANEL */}
-      <div className="absolute top-20 right-4 z-[400] bg-background/95 backdrop-blur-md border border-border rounded-xl p-3 shadow-xl space-y-1.5 text-xs hidden md:block w-48">
+      <div className="absolute top-64 right-4 z-[400] bg-background/95 backdrop-blur-md border border-border rounded-xl p-3 shadow-xl space-y-1.5 text-xs hidden md:block w-52">
         <span className="font-extrabold text-foreground block text-[11px] uppercase tracking-wider mb-1">
           Street Flood Depth
         </span>
@@ -438,6 +615,50 @@ export default function FloodMap() {
         />
 
         <MapRecenter center={center} />
+
+        {/* LIVE RAINFALL ALERT LAYER OVERLAY */}
+        {layers.rainfall &&
+          rainfallData.areas?.map((area, idx) => {
+            const classification = classifyRainfallIntensity(area.rainfallMmPerHour);
+            return (
+              <Circle
+                key={`rain-${idx}-${area.lat}-${area.lng}`}
+                center={[area.lat, area.lng]}
+                radius={1300}
+                pathOptions={{
+                  color: classification.hex,
+                  fillColor: classification.hex,
+                  fillOpacity: 0.35,
+                  weight: 2,
+                }}
+              >
+                <Popup>
+                  <div className="p-2 space-y-2 text-xs min-w-[210px]">
+                    <div className="flex items-center justify-between border-b border-border pb-1">
+                      <span className="font-extrabold text-foreground flex items-center gap-1.5 text-xs">
+                        <CloudRain className="h-4 w-4 text-blue-500" /> Live Rainfall Alert
+                      </span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${classification.badgeClass}`}>
+                        {classification.category}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1 text-muted-foreground text-[11px]">
+                      <div>Location: <strong className="text-foreground">{area.locationName}</strong></div>
+                      <div>Coordinates: <strong className="text-foreground">{area.lat.toFixed(4)}, {area.lng.toFixed(4)}</strong></div>
+                      <div>Rainfall Rate: <strong className={`font-extrabold ${classification.textClass}`}>{area.rainfallMmPerHour} mm/hr</strong></div>
+                      <div>Intensity Level: <strong className="text-foreground">{classification.label} ({classification.rangeLabel})</strong></div>
+                      <div>Last updated: <strong className="text-foreground">{formatDate(area.timestamp)}</strong></div>
+                    </div>
+
+                    <div className="pt-1 border-t border-border/60 text-[10px] text-brand-600 dark:text-brand-400 font-medium italic">
+                      This rainfall is contributing to flood-risk calculations.
+                    </div>
+                  </div>
+                </Popup>
+              </Circle>
+            );
+          })}
 
         {/* STREET-LEVEL RISK POLYLINES */}
         {layers.streetRisk &&

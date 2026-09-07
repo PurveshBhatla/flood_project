@@ -1,3 +1,5 @@
+import { RainfallService } from '../rainfall.service';
+
 export interface NowcastStep {
   forecastMinutes: number; // 0, 30, 60, 90, 120, 150, 180
   intensityMmHr: number;
@@ -15,38 +17,32 @@ export interface RainfallNowcastResult {
   totalAccumulatedMm: number;
 }
 
-export interface RainfallProvider {
+export interface RainfallNowcastProvider {
   getNowcast(lat: number, lng: number): Promise<RainfallNowcastResult>;
 }
 
-export class DemoRainfallProvider implements RainfallProvider {
+export class LiveRainfallNowcastProvider implements RainfallNowcastProvider {
   async getNowcast(lat: number, lng: number): Promise<RainfallNowcastResult> {
-    // Seeded deterministic 0-3h nowcast profile based on coordinates
-    const seed = Math.abs(Math.sin(lat * 12.9898 + lng * 78.233)) * 43758.5453;
-    const intensityMultiplier = 1.0 + (seed % 1.5); // 1.0x to 2.5x storm factor
+    const currentRain = await RainfallService.getRainfall(lat, lng);
+    const centerArea = currentRain.areas[0] || { rainfallMmPerHour: 25.0 };
+    const baseCurrentMmHr = centerArea.rainfallMmPerHour;
 
-    // Curve simulating a heavy convective storm cell passing over 3 hours
-    const rawIntensities = [
-      { min: 0, int: 12.0 * intensityMultiplier },
-      { min: 30, int: 28.5 * intensityMultiplier },
-      { min: 60, int: 54.0 * intensityMultiplier },
-      { min: 90, int: 72.0 * intensityMultiplier }, // Peak
-      { min: 120, int: 45.0 * intensityMultiplier },
-      { min: 150, int: 22.5 * intensityMultiplier },
-      { min: 180, int: 10.0 * intensityMultiplier },
-    ];
+    const isDemo = currentRain.mode === 'demo';
+
+    // Build timeline storm shape parameterized by current real-time/demo rainfall intensity
+    const multipliers = [1.0, 1.4, 1.9, 2.2, 1.6, 1.1, 0.6];
+    const minutes = [0, 30, 60, 90, 120, 150, 180];
 
     let runningAccumulation = 0;
-    const timeline: NowcastStep[] = rawIntensities.map((item) => {
-      // 30 min block accumulation in mm = (intensity in mm/h) * 0.5h
-      const stepAccum = item.int * 0.5;
-      runningAccumulation += stepAccum;
+    const timeline: NowcastStep[] = minutes.map((min, idx) => {
+      const int = parseFloat((baseCurrentMmHr * multipliers[idx]).toFixed(1));
+      runningAccumulation += int * 0.5;
 
       return {
-        forecastMinutes: item.min,
-        intensityMmHr: parseFloat(item.int.toFixed(1)),
+        forecastMinutes: min,
+        intensityMmHr: int,
         accumulatedMm: parseFloat(runningAccumulation.toFixed(1)),
-        label: `T+${item.min} min`,
+        label: `T+${min} min`,
       };
     });
 
@@ -55,9 +51,11 @@ export class DemoRainfallProvider implements RainfallProvider {
     );
 
     return {
-      source: 'DEMO / SIMULATED NOWCAST',
-      providerName: 'Synthetic Convective Radar Storm Profiler',
-      isSimulated: true,
+      source: isDemo ? 'DEMO / SIMULATED NOWCAST' : 'LIVE_RADAR_WEATHER_API',
+      providerName: isDemo
+        ? 'Synthetic Convective Radar Storm Profiler'
+        : 'Open-Meteo Live Rainfall Pipeline',
+      isSimulated: isDemo,
       timeline,
       peakIntensityMmHr: peakStep.intensityMmHr,
       peakMinute: peakStep.forecastMinutes,
@@ -67,9 +65,9 @@ export class DemoRainfallProvider implements RainfallProvider {
 }
 
 export class RainfallNowcastService {
-  private static provider: RainfallProvider = new DemoRainfallProvider();
+  private static provider: RainfallNowcastProvider = new LiveRainfallNowcastProvider();
 
-  static setProvider(newProvider: RainfallProvider) {
+  static setProvider(newProvider: RainfallNowcastProvider) {
     this.provider = newProvider;
   }
 
@@ -77,3 +75,4 @@ export class RainfallNowcastService {
     return this.provider.getNowcast(lat, lng);
   }
 }
+

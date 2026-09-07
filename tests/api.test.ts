@@ -98,3 +98,39 @@ test('7. Street Flood Depth Color Code Scheme', () => {
   assert.equal(getDepthColor(40.0).label.includes('RED'), true);
   assert.equal(getDepthColor(70.0).label.includes('DARK RED'), true);
 });
+
+test('8. Centralized Rainfall Classification & Thresholds', () => {
+  const { classifyRainfallIntensity, RAINFALL_THRESHOLDS } = require('../lib/utils');
+  assert.equal(RAINFALL_THRESHOLDS.LOW_MAX, 10);
+  assert.equal(RAINFALL_THRESHOLDS.MODERATE_MAX, 25);
+
+  const low = classifyRainfallIntensity(5.0);
+  assert.equal(low.category, 'LOW');
+  assert.equal(low.color, 'GREEN');
+  assert.equal(low.hex, '#10b981');
+
+  const mod = classifyRainfallIntensity(18.5);
+  assert.equal(mod.category, 'MODERATE');
+  assert.equal(mod.color, 'YELLOW');
+  assert.equal(mod.hex, '#f59e0b');
+
+  const extreme = classifyRainfallIntensity(35.0);
+  assert.equal(extreme.category, 'EXTREME');
+  assert.equal(extreme.color, 'RED');
+  assert.equal(extreme.hex, '#ef4444');
+});
+
+test('9. Rainfall Service & Provider Architecture (Demo Fallback)', async () => {
+  const { RainfallService } = require('../lib/services/rainfall.service');
+  const result = await RainfallService.getRainfall(19.076, 72.8777);
+  assert.ok(['live', 'demo'].includes(result.mode));
+  assert.ok(result.areas.length > 0);
+  
+  const firstArea = result.areas[0];
+  assert.ok(typeof firstArea.lat === 'number');
+  assert.ok(typeof firstArea.lng === 'number');
+  assert.ok(typeof firstArea.rainfallMmPerHour === 'number');
+  assert.ok(['LOW', 'MODERATE', 'EXTREME'].includes(firstArea.category));
+  assert.ok(firstArea.timestamp);
+});
+

@@ -71,6 +71,59 @@ export function getRiskLevelColor(level: string): {
   }
 }
 
+export const RAINFALL_THRESHOLDS = {
+  LOW_MAX: 10,
+  MODERATE_MAX: 25,
+};
+
+export interface RainfallClassification {
+  category: 'LOW' | 'MODERATE' | 'EXTREME';
+  color: 'GREEN' | 'YELLOW' | 'RED';
+  hex: string;
+  label: string;
+  badgeClass: string;
+  bgClass: string;
+  textClass: string;
+  rangeLabel: string;
+}
+
+export function classifyRainfallIntensity(mmPerHour: number): RainfallClassification {
+  if (mmPerHour <= RAINFALL_THRESHOLDS.LOW_MAX) {
+    return {
+      category: 'LOW',
+      color: 'GREEN',
+      hex: '#10b981',
+      label: 'Low',
+      badgeClass: 'bg-emerald-500 text-white',
+      bgClass: 'bg-emerald-500/10',
+      textClass: 'text-emerald-500',
+      rangeLabel: '0–10 mm/hr',
+    };
+  } else if (mmPerHour <= RAINFALL_THRESHOLDS.MODERATE_MAX) {
+    return {
+      category: 'MODERATE',
+      color: 'YELLOW',
+      hex: '#f59e0b',
+      label: 'Moderate',
+      badgeClass: 'bg-amber-500 text-white',
+      bgClass: 'bg-amber-500/10',
+      textClass: 'text-amber-500',
+      rangeLabel: '10–25 mm/hr',
+    };
+  } else {
+    return {
+      category: 'EXTREME',
+      color: 'RED',
+      hex: '#ef4444',
+      label: 'Extreme',
+      badgeClass: 'bg-red-500 text-white',
+      bgClass: 'bg-red-500/10',
+      textClass: 'text-red-500',
+      rangeLabel: '25+ mm/hr',
+    };
+  }
+}
+
 export function formatNumber(val: number, decimals: number = 1): string {
   return new Intl.NumberFormat('en-US', {
     minimumFractionDigits: decimals,
@@ -87,3 +140,4 @@ export function formatDate(date: Date | string): string {
     minute: '2-digit',
   });
 }
+

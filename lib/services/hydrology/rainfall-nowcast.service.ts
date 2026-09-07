@@ -25,7 +25,8 @@ export class LiveRainfallNowcastProvider implements RainfallNowcastProvider {
   async getNowcast(lat: number, lng: number): Promise<RainfallNowcastResult> {
     const currentRain = await RainfallService.getRainfall(lat, lng);
     const centerArea = currentRain.areas[0] || { rainfallMmPerHour: 25.0 };
-    const baseCurrentMmHr = centerArea.rainfallMmPerHour;
+    // Use current rainfall if non-zero, or baseline 12.0 mm/h storm scenario
+    const baseCurrentMmHr = centerArea.rainfallMmPerHour > 0 ? centerArea.rainfallMmPerHour : 12.0;
 
     const isDemo = currentRain.mode === 'demo';
 

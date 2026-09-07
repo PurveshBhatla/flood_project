@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { classifyRainfallIntensity, formatDate } from '@/lib/utils';
-import { Play, Pause, Compass, Eye, MapPin, RefreshCw, CloudRain, ExternalLink, Flame } from 'lucide-react';
+import { Play, Pause, Compass, MapPin, CloudRain, ExternalLink, Flame, Info, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 
 interface Hotspot {
@@ -16,6 +16,7 @@ interface Hotspot {
   category: 'LOW' | 'MODERATE' | 'HEAVY' | 'EXTREME';
   color: 'GREEN' | 'YELLOW' | 'ORANGE' | 'RED';
   severity?: 'HEAVY' | 'EXTREME';
+  locationName?: string;
   timestamp?: string;
 }
 
@@ -34,6 +35,7 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
   const [isRotating, setIsRotating] = useState(true);
   const [webglSupported, setWebglSupported] = useState(true);
   const [hoveredHotspot, setHoveredHotspot] = useState<Hotspot | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [selectedHotspot, setSelectedHotspot] = useState<Hotspot | null>(null);
 
   // References for Three.js state
@@ -44,6 +46,8 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
   const markersGroupRef = useRef<THREE.Group | null>(null);
   const targetRotationRef = useRef<{ x: number; y: number } | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const raycasterRef = useRef<THREE.Raycaster>(new THREE.Raycaster());
+  const mouseRef = useRef<THREE.Vector2>(new THREE.Vector2());
 
   // Check WebGL availability
   useEffect(() => {
@@ -75,7 +79,7 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
     if (!mountRef.current || !webglSupported) return;
 
     const width = mountRef.current.clientWidth || 600;
-    const height = mountRef.current.clientHeight || 450;
+    const height = mountRef.current.clientHeight || 480;
 
     // Scene
     const scene = new THREE.Scene();
@@ -104,16 +108,16 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
     // 1. Earth Sphere Base Mesh
     const sphereGeometry = new THREE.SphereGeometry(2, 64, 64);
     
-    // Procedural dark ocean texture canvas
+    // Procedural dark ocean & continent texture canvas
     const canvas = document.createElement('canvas');
     canvas.width = 1024;
     canvas.height = 512;
     const ctx = canvas.getContext('2d')!;
-    ctx.fillStyle = '#071529'; // Deep Navy Ocean
+    ctx.fillStyle = '#061426'; // Deep Dark Navy Ocean
     ctx.fillRect(0, 0, 1024, 512);
 
-    // Draw continent outlines/shapes procedurally
-    ctx.fillStyle = '#102d4d'; // Dark Slate Continent
+    // Draw continents procedurally
+    ctx.fillStyle = '#0f3256'; // Dark Cyan Continent
     // Asia / India
     ctx.beginPath();
     ctx.ellipse(730, 200, 160, 100, 0, 0, Math.PI * 2);
@@ -136,7 +140,7 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
     ctx.fill();
 
     // Grid Latitude / Longitude lines
-    ctx.strokeStyle = '#1e4875';
+    ctx.strokeStyle = '#1a4975';
     ctx.lineWidth = 1;
     for (let i = 0; i <= 512; i += 40) {
       ctx.beginPath();
@@ -154,7 +158,7 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
     const texture = new THREE.CanvasTexture(canvas);
     const globeMaterial = new THREE.MeshPhongMaterial({
       map: texture,
-      shininess: 15,
+      shininess: 20,
       specular: new THREE.Color('#00a8ff'),
     });
     const globeMesh = new THREE.Mesh(sphereGeometry, globeMaterial);
@@ -165,7 +169,7 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
     const atmosphereMaterial = new THREE.MeshBasicMaterial({
       color: new THREE.Color('#00e5ff'),
       transparent: true,
-      opacity: 0.12,
+      opacity: 0.14,
       side: THREE.BackSide,
     });
     const atmosphereMesh = new THREE.Mesh(atmosphereGeometry, atmosphereMaterial);
@@ -173,17 +177,17 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
 
     // 3. Low-Intensity Stars Field Background
     const starsGeometry = new THREE.BufferGeometry();
-    const starsCount = 400;
+    const starsCount = 450;
     const starPositions = new Float32Array(starsCount * 3);
     for (let i = 0; i < starsCount * 3; i += 3) {
-      starPositions[i] = (Math.random() - 0.5) * 40;
-      starPositions[i + 1] = (Math.random() - 0.5) * 40;
-      starPositions[i + 2] = (Math.random() - 0.5) * 40;
+      starPositions[i] = (Math.random() - 0.5) * 45;
+      starPositions[i + 1] = (Math.random() - 0.5) * 45;
+      starPositions[i + 2] = (Math.random() - 0.5) * 45;
     }
     starsGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
     const starsMaterial = new THREE.PointsMaterial({
       color: 0xffffff,
-      size: 0.05,
+      size: 0.045,
       transparent: true,
       opacity: 0.5,
     });
@@ -194,7 +198,7 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0x00e5ff, 1.2);
+    const directionalLight = new THREE.DirectionalLight(0x00e5ff, 1.25);
     directionalLight.position.set(5, 3, 5);
     scene.add(directionalLight);
 
@@ -263,7 +267,7 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
       }
       renderer.dispose();
     };
-  }, [webglSupported]);
+  }, [webglSupported, isRotating]);
 
   // Update 3D Hotspot Markers whenever rainfallData changes
   useEffect(() => {
@@ -286,8 +290,8 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
       const colorHex = classification.hex;
       const isHeavy = spot.rainfallMmPerHour >= 25.0;
 
-      // 1. Core 3D Dot Mesh
-      const dotRadius = isHeavy ? 0.06 : 0.04;
+      // 1. Core 3D Mesh Dot
+      const dotRadius = isHeavy ? 0.065 : 0.045;
       const dotGeo = new THREE.SphereGeometry(dotRadius, 16, 16);
       const dotMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(colorHex) });
       const dotMesh = new THREE.Mesh(dotGeo, dotMat);
@@ -297,7 +301,7 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
 
       // 2. Halo Cylinder / Pulsing Ring for Heavy/Extreme Rainfall
       if (isHeavy) {
-        const ringGeo = new THREE.RingGeometry(0.07, 0.13, 24);
+        const ringGeo = new THREE.RingGeometry(0.08, 0.14, 24);
         const ringMat = new THREE.MeshBasicMaterial({
           color: new THREE.Color(colorHex),
           side: THREE.DoubleSide,
@@ -307,11 +311,52 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
         const ringMesh = new THREE.Mesh(ringGeo, ringMat);
         ringMesh.position.copy(pos);
         ringMesh.lookAt(new THREE.Vector3(0, 0, 0)); // Orient flat to surface
-        ringMesh.userData = { isPulseRing: true };
+        ringMesh.userData = { isPulseRing: true, spot };
         markersGroupRef.current?.add(ringMesh);
       }
     });
   }, [rainfallData]);
+
+  // Raycasting for Mouse Hover Tooltips and Clicks on 3D Globe Markers
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!mountRef.current || !cameraRef.current || !markersGroupRef.current) return;
+    const rect = mountRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+    mouseRef.current.set(x, y);
+    raycasterRef.current.setFromCamera(mouseRef.current, cameraRef.current);
+
+    const intersects = raycasterRef.current.intersectObjects(markersGroupRef.current.children);
+    const hit = intersects.find((i) => i.object.userData?.spot);
+
+    if (hit) {
+      setHoveredHotspot(hit.object.userData.spot);
+      setTooltipPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    } else {
+      setHoveredHotspot(null);
+    }
+  };
+
+  const handleClickGlobe = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!mountRef.current || !cameraRef.current || !markersGroupRef.current) return;
+    const rect = mountRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+    mouseRef.current.set(x, y);
+    raycasterRef.current.setFromCamera(mouseRef.current, cameraRef.current);
+
+    const intersects = raycasterRef.current.intersectObjects(markersGroupRef.current.children);
+    const hit = intersects.find((i) => i.object.userData?.spot);
+
+    if (hit) {
+      const spot = hit.object.userData.spot;
+      setSelectedHotspot(spot);
+      rotateGlobeToLatLng(spot.lat, spot.lng);
+      if (onSelectHotspot) onSelectHotspot(spot);
+    }
+  };
 
   // Smoothly rotate 3D Globe to target (lat, lng)
   const rotateGlobeToLatLng = (lat: number, lng: number) => {
@@ -321,7 +366,7 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
     targetRotationRef.current = { x: targetX, y: targetY };
   };
 
-  // Find top rainfall hotspot
+  // Top rainfall hotspot
   const topHotspot = rainfallData?.hotspots && rainfallData.hotspots.length > 0
     ? rainfallData.hotspots[0]
     : null;
@@ -335,10 +380,15 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
   };
 
   return (
-    <div className="relative w-full h-[420px] md:h-[480px] rounded-3xl overflow-hidden border border-border/80 bg-[#061426] shadow-2xl">
+    <div className="relative w-full h-[440px] md:h-[500px] rounded-3xl overflow-hidden border border-border/80 bg-[#061426] shadow-2xl">
       {/* Background 3D Canvas / WebGL Fallback */}
       {webglSupported ? (
-        <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
+        <div
+          ref={mountRef}
+          onMouseMove={handleMouseMove}
+          onClick={handleClickGlobe}
+          className="w-full h-full cursor-grab active:cursor-grabbing"
+        />
       ) : (
         /* Static WebGL Fallback Graphic */
         <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-[#061426] via-[#092240] to-[#040e1b] p-6 text-center space-y-3">
@@ -349,8 +399,31 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
         </div>
       )}
 
-      {/* Floating Dark Gradient Overlay for Text Readability */}
+      {/* Floating Dark Gradient Overlay for Dashboard Readability */}
       <div className="absolute inset-0 bg-gradient-to-r from-[#061426]/90 via-[#061426]/60 to-transparent pointer-events-none" />
+
+      {/* Hover Tooltip Popup near Cursor */}
+      {hoveredHotspot && (
+        <div
+          style={{ top: tooltipPos.y + 12, left: tooltipPos.x + 12 }}
+          className="absolute z-30 p-2.5 rounded-xl bg-slate-900/95 border border-slate-700 shadow-2xl text-xs space-y-1 pointer-events-none min-w-[180px]"
+        >
+          <div className="flex items-center justify-between border-b border-slate-800 pb-1">
+            <span className="font-extrabold text-white text-xs flex items-center gap-1">
+              <MapPin className="h-3 w-3 text-cyan-400" /> {hoveredHotspot.name || hoveredHotspot.locationName}
+            </span>
+            <span className={`px-1.5 py-0.2 rounded text-[9px] font-extrabold ${classifyRainfallIntensity(hoveredHotspot.rainfallMmPerHour).badgeClass}`}>
+              {classifyRainfallIntensity(hoveredHotspot.rainfallMmPerHour).category}
+            </span>
+          </div>
+          <div className="text-[11px] text-slate-300">
+            Rainfall Rate: <strong className="text-white">{hoveredHotspot.rainfallMmPerHour} mm/hr</strong>
+          </div>
+          <div className="text-[10px] text-slate-400">
+            Status: {hoveredHotspot.rainfallMmPerHour >= 25 ? '🔴 HEAVY RAINFALL' : '🟢 MODERATE / LIGHT'}
+          </div>
+        </div>
+      )}
 
       {/* Hero Content Overlay (Top-Left) */}
       <div className="absolute top-6 left-6 z-10 space-y-3 max-w-md pointer-events-auto">
@@ -371,9 +444,9 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
         {/* Global vs India Coverage Badge */}
         <div className="flex items-center gap-2 text-[11px] text-slate-300">
           <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-bold uppercase tracking-wide">
-            {rainfallData?.mode === 'live' ? '● LIVE DATA' : '● DEMO DATA'}
+            {rainfallData?.mode === 'live' ? '● LIVE RAINFALL' : '● DEMO DATA'}
           </span>
-          <span className="text-slate-400">Coverage: India Spatial Grid</span>
+          <span className="text-slate-400">Coverage: Live rainfall coverage: India</span>
         </div>
 
         {/* Quick Hotspot Focus Action Buttons */}
@@ -399,7 +472,7 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
       </div>
 
       {/* Floating 🔴 LIVE RAINFALL MONITOR Summary Card (Top-Right Overlay) */}
-      <div className="absolute top-6 right-6 z-10 w-72 bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-2xl p-4 shadow-2xl space-y-3 hidden sm:block">
+      <div className="absolute top-6 right-6 z-10 w-72 bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-2xl p-4 shadow-2xl space-y-3 hidden sm:block pointer-events-auto">
         <div className="flex items-center justify-between border-b border-slate-800 pb-2">
           <span className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-1.5">
             <Flame className="h-4 w-4 text-red-500 animate-pulse" /> Live Rainfall Monitor
@@ -452,7 +525,7 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
 
       {/* Selected Hotspot Detail Card (Bottom Center Overlay) */}
       {selectedHotspot && (
-        <div className="absolute bottom-6 left-6 right-6 md:left-auto md:right-6 z-20 max-w-md bg-slate-900/95 backdrop-blur-md border border-slate-800 rounded-2xl p-4 shadow-2xl space-y-2 text-xs">
+        <div className="absolute bottom-6 left-6 right-6 md:left-auto md:right-6 z-20 max-w-md bg-slate-900/95 backdrop-blur-md border border-slate-800 rounded-2xl p-4 shadow-2xl space-y-2 text-xs pointer-events-auto">
           <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
             <span className="font-extrabold text-white text-sm flex items-center gap-1.5">
               <MapPin className="h-4 w-4 text-red-500" /> {selectedHotspot.name}, {selectedHotspot.state}

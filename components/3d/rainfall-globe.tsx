@@ -33,6 +33,13 @@ interface RainfallGlobeProps {
 export default function RainfallGlobe({ rainfallData, onSelectHotspot }: RainfallGlobeProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [isRotating, setIsRotating] = useState(true);
+  const isRotatingRef = useRef(isRotating);
+
+  // Sync ref with state without re-creating Three.js scene
+  useEffect(() => {
+    isRotatingRef.current = isRotating;
+  }, [isRotating]);
+
   const [webglSupported, setWebglSupported] = useState(true);
   const [hoveredHotspot, setHoveredHotspot] = useState<Hotspot | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -74,30 +81,30 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
     return new THREE.Vector3(x, y, z);
   };
 
-  // Initialize Three.js 3D Globe
+  // Initialize Three.js 3D Globe - Runs ONCE on mount
   useEffect(() => {
     if (!mountRef.current || !webglSupported) return;
 
-    const width = mountRef.current.clientWidth || 600;
+    const width = mountRef.current.clientWidth || 800;
     const height = mountRef.current.clientHeight || 480;
 
-    // Scene
+    // 1. Scene
     const scene = new THREE.Scene();
     sceneRef.current = scene;
 
-    // Camera
+    // 2. Camera
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
     camera.position.z = 5.2;
     cameraRef.current = camera;
 
-    // Renderer
+    // 3. Renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     mountRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // Main Globe Group
+    // 4. Main Globe Group
     const globeGroup = new THREE.Group();
     // Default initial rotation centered around India (lat ~20, lng ~78)
     globeGroup.rotation.y = -Math.PI / 2.3;
@@ -105,42 +112,56 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
     scene.add(globeGroup);
     globeGroupRef.current = globeGroup;
 
-    // 1. Earth Sphere Base Mesh
+    // 5. Earth Sphere Base Mesh
     const sphereGeometry = new THREE.SphereGeometry(2, 64, 64);
     
-    // Procedural dark ocean & continent texture canvas
+    // High-contrast Earth Texture Canvas
     const canvas = document.createElement('canvas');
     canvas.width = 1024;
     canvas.height = 512;
     const ctx = canvas.getContext('2d')!;
-    ctx.fillStyle = '#061426'; // Deep Dark Navy Ocean
+    
+    // Ocean Base Color
+    ctx.fillStyle = '#08182b'; // Dark Navy Ocean
     ctx.fillRect(0, 0, 1024, 512);
 
-    // Draw continents procedurally
-    ctx.fillStyle = '#0f3256'; // Dark Cyan Continent
-    // Asia / India
+    // Draw Continents with High-Contrast Blue-Slate Color
+    ctx.fillStyle = '#16436e'; // Bright Slate Continent
+    // Asia / India Subcontinent
     ctx.beginPath();
     ctx.ellipse(730, 200, 160, 100, 0, 0, Math.PI * 2);
     ctx.fill();
+
+    // India Peninsular Projection
+    ctx.beginPath();
+    ctx.moveTo(710, 200);
+    ctx.lineTo(740, 270);
+    ctx.lineTo(760, 210);
+    ctx.closePath();
+    ctx.fill();
+
     // Europe
     ctx.beginPath();
     ctx.ellipse(550, 150, 80, 60, 0, 0, Math.PI * 2);
     ctx.fill();
+
     // Africa
     ctx.beginPath();
     ctx.ellipse(540, 290, 90, 120, 0, 0, Math.PI * 2);
     ctx.fill();
+
     // Americas
     ctx.beginPath();
     ctx.ellipse(280, 220, 100, 160, 0, 0, Math.PI * 2);
     ctx.fill();
+
     // Australia
     ctx.beginPath();
     ctx.ellipse(830, 360, 70, 50, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // Grid Latitude / Longitude lines
-    ctx.strokeStyle = '#1a4975';
+    ctx.strokeStyle = '#1e5a96';
     ctx.lineWidth = 1;
     for (let i = 0; i <= 512; i += 40) {
       ctx.beginPath();
@@ -156,28 +177,30 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
     }
 
     const texture = new THREE.CanvasTexture(canvas);
-    const globeMaterial = new THREE.MeshPhongMaterial({
+    
+    // Lambert/Standard Material with Emissive Glow ensuring visibility
+    const globeMaterial = new THREE.MeshLambertMaterial({
       map: texture,
-      shininess: 20,
-      specular: new THREE.Color('#00a8ff'),
+      emissive: new THREE.Color('#0a203a'),
+      emissiveIntensity: 0.6,
     });
     const globeMesh = new THREE.Mesh(sphereGeometry, globeMaterial);
     globeGroup.add(globeMesh);
 
-    // 2. Atmospheric Glow Outer Shell
-    const atmosphereGeometry = new THREE.SphereGeometry(2.15, 48, 48);
+    // 6. Atmospheric Glow Outer Shell
+    const atmosphereGeometry = new THREE.SphereGeometry(2.12, 48, 48);
     const atmosphereMaterial = new THREE.MeshBasicMaterial({
       color: new THREE.Color('#00e5ff'),
       transparent: true,
-      opacity: 0.14,
+      opacity: 0.18,
       side: THREE.BackSide,
     });
     const atmosphereMesh = new THREE.Mesh(atmosphereGeometry, atmosphereMaterial);
     globeGroup.add(atmosphereMesh);
 
-    // 3. Low-Intensity Stars Field Background
+    // 7. Low-Intensity Stars Field Background
     const starsGeometry = new THREE.BufferGeometry();
-    const starsCount = 450;
+    const starsCount = 500;
     const starPositions = new Float32Array(starsCount * 3);
     for (let i = 0; i < starsCount * 3; i += 3) {
       starPositions[i] = (Math.random() - 0.5) * 45;
@@ -186,46 +209,56 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
     }
     starsGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
     const starsMaterial = new THREE.PointsMaterial({
-      color: 0xffffff,
-      size: 0.045,
+      color: 0x88d6ff,
+      size: 0.05,
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.65,
     });
     const starField = new THREE.Points(starsGeometry, starsMaterial);
     scene.add(starField);
 
-    // 4. Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
+    // 8. Strong Ambient & Directional Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0x00e5ff, 1.25);
-    directionalLight.position.set(5, 3, 5);
-    scene.add(directionalLight);
+    const directionalLight1 = new THREE.DirectionalLight(0x00e5ff, 1.5);
+    directionalLight1.position.set(5, 3, 5);
+    scene.add(directionalLight1);
 
-    // Group for Hotspot 3D Markers
+    const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight2.position.set(-5, -3, -5);
+    scene.add(directionalLight2);
+
+    // 9. Group for Hotspot 3D Markers
     const markersGroup = new THREE.Group();
     globeGroup.add(markersGroup);
     markersGroupRef.current = markersGroup;
 
-    // Resize Handler
-    const handleResize = () => {
-      if (!mountRef.current || !renderer || !camera) return;
-      const w = mountRef.current.clientWidth;
-      const h = mountRef.current.clientHeight;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
-    };
-    window.addEventListener('resize', handleResize);
+    // Resize Observer for robust dynamic responsiveness
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        const w = entry.contentRect.width;
+        const h = entry.contentRect.height;
+        if (w > 0 && h > 0 && camera && renderer) {
+          camera.aspect = w / h;
+          camera.updateProjectionMatrix();
+          renderer.setSize(w, h);
+        }
+      }
+    });
 
-    // Animation Loop
+    if (mountRef.current) {
+      resizeObserver.observe(mountRef.current);
+    }
+
+    // 10. Animation Loop
     let pulseTime = 0;
     const animate = () => {
       animationFrameRef.current = requestAnimationFrame(animate);
       pulseTime += 0.04;
 
       // Automatic slow Globe rotation
-      if (isRotating && globeGroupRef.current && !targetRotationRef.current) {
+      if (isRotatingRef.current && globeGroupRef.current && !targetRotationRef.current) {
         globeGroupRef.current.rotation.y += 0.0015;
       }
 
@@ -235,7 +268,6 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
         globeGroupRef.current.rotation.y += (target.y - globeGroupRef.current.rotation.y) * 0.05;
         globeGroupRef.current.rotation.x += (target.x - globeGroupRef.current.rotation.x) * 0.05;
 
-        // Stop smooth lerp when close enough
         if (
           Math.abs(target.y - globeGroupRef.current.rotation.y) < 0.005 &&
           Math.abs(target.x - globeGroupRef.current.rotation.x) < 0.005
@@ -248,7 +280,7 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
       if (markersGroupRef.current) {
         markersGroupRef.current.children.forEach((child) => {
           if (child.userData?.isPulseRing) {
-            const scale = 1.0 + Math.sin(pulseTime * 2) * 0.25;
+            const scale = 1.0 + Math.sin(pulseTime * 2) * 0.3;
             child.scale.set(scale, scale, scale);
           }
         });
@@ -260,14 +292,17 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
     animate();
 
     return () => {
-      window.removeEventListener('resize', handleResize);
+      if (mountRef.current) {
+        resizeObserver.unobserve(mountRef.current);
+      }
+      resizeObserver.disconnect();
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
       if (renderer.domElement && mountRef.current) {
         mountRef.current.removeChild(renderer.domElement);
       }
       renderer.dispose();
     };
-  }, [webglSupported, isRotating]);
+  }, [webglSupported]); // Explicitly run ONCE on mount!
 
   // Update 3D Hotspot Markers whenever rainfallData changes
   useEffect(() => {
@@ -291,7 +326,7 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
       const isHeavy = spot.rainfallMmPerHour >= 25.0;
 
       // 1. Core 3D Mesh Dot
-      const dotRadius = isHeavy ? 0.065 : 0.045;
+      const dotRadius = isHeavy ? 0.07 : 0.045;
       const dotGeo = new THREE.SphereGeometry(dotRadius, 16, 16);
       const dotMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(colorHex) });
       const dotMesh = new THREE.Mesh(dotGeo, dotMat);
@@ -299,14 +334,14 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
       dotMesh.userData = { spot };
       markersGroupRef.current?.add(dotMesh);
 
-      // 2. Halo Cylinder / Pulsing Ring for Heavy/Extreme Rainfall
+      // 2. Pulsing Glow Ring for Heavy/Extreme Rainfall
       if (isHeavy) {
-        const ringGeo = new THREE.RingGeometry(0.08, 0.14, 24);
+        const ringGeo = new THREE.RingGeometry(0.08, 0.16, 24);
         const ringMat = new THREE.MeshBasicMaterial({
           color: new THREE.Color(colorHex),
           side: THREE.DoubleSide,
           transparent: true,
-          opacity: 0.6,
+          opacity: 0.7,
         });
         const ringMesh = new THREE.Mesh(ringGeo, ringMat);
         ringMesh.position.copy(pos);
@@ -380,7 +415,7 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
   };
 
   return (
-    <div className="relative w-full h-[440px] md:h-[500px] rounded-3xl overflow-hidden border border-border/80 bg-[#061426] shadow-2xl">
+    <div className="relative w-full h-[400px] sm:h-[460px] md:h-[520px] rounded-3xl overflow-hidden border border-cyan-900/50 bg-[#040e1a] shadow-2xl">
       {/* Background 3D Canvas / WebGL Fallback */}
       {webglSupported ? (
         <div
@@ -400,13 +435,13 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
       )}
 
       {/* Floating Dark Gradient Overlay for Dashboard Readability */}
-      <div className="absolute inset-0 bg-gradient-to-r from-[#061426]/90 via-[#061426]/60 to-transparent pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#040e1a]/95 via-[#040e1a]/65 to-transparent pointer-events-none" />
 
       {/* Hover Tooltip Popup near Cursor */}
       {hoveredHotspot && (
         <div
           style={{ top: tooltipPos.y + 12, left: tooltipPos.x + 12 }}
-          className="absolute z-30 p-2.5 rounded-xl bg-slate-900/95 border border-slate-700 shadow-2xl text-xs space-y-1 pointer-events-none min-w-[180px]"
+          className="absolute z-30 p-2.5 rounded-xl bg-slate-900/95 border border-slate-700 shadow-2xl text-xs space-y-1 pointer-events-none min-w-[185px]"
         >
           <div className="flex items-center justify-between border-b border-slate-800 pb-1">
             <span className="font-extrabold text-white text-xs flex items-center gap-1">
@@ -446,7 +481,7 @@ export default function RainfallGlobe({ rainfallData, onSelectHotspot }: Rainfal
           <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-bold uppercase tracking-wide">
             {rainfallData?.mode === 'live' ? '● LIVE RAINFALL' : '● DEMO DATA'}
           </span>
-          <span className="text-slate-400">Coverage: Live rainfall coverage: India</span>
+          <span className="text-slate-400">Live rainfall coverage: India</span>
         </div>
 
         {/* Quick Hotspot Focus Action Buttons */}

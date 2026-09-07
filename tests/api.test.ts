@@ -169,5 +169,39 @@ test('11. RescueResourceService Emergency Availability Feed', async () => {
   assert.ok(data.resources[0].longitude);
 });
 
+test('12. Haversine Distance Calculation & Nearest Safe Shelters Sorting', () => {
+  const { haversineDistance } = require('../lib/utils');
+  
+  // Coordinates for Mumbai center (19.076, 72.8777) to Bandra (19.0596, 72.8295)
+  const distBand = haversineDistance(19.076, 72.8777, 19.0596, 72.8295);
+  // Distance to Thane (19.2183, 72.9781)
+  const distThane = haversineDistance(19.076, 72.8777, 19.2183, 72.9781);
+
+  assert.ok(distBand > 0 && distBand < 10, 'Bandra distance should be ~5-6 km');
+  assert.ok(distThane > distBand, 'Thane should be further than Bandra');
+
+  const shelters = [
+    { name: 'Far Shelter', lat: 19.2183, lng: 72.9781, status: 'AVAILABLE', count: 100 },
+    { name: 'Near Safe Shelter', lat: 19.088, lng: 72.870, status: 'AVAILABLE', count: 200 },
+    { name: 'Unsafe Full Shelter', lat: 19.077, lng: 72.878, status: 'UNAVAILABLE', count: 0 },
+  ];
+
+  const userLat = 19.076;
+  const userLng = 72.8777;
+
+  const sortedSafe = shelters
+    .map((s) => ({
+      ...s,
+      dist: haversineDistance(userLat, userLng, s.lat, s.lng),
+      isSafe: s.status === 'AVAILABLE' && s.count > 0,
+    }))
+    .filter((s) => s.isSafe)
+    .sort((a, b) => a.dist - b.dist);
+
+  assert.equal(sortedSafe[0].name, 'Near Safe Shelter');
+  assert.ok(sortedSafe[0].dist < sortedSafe[1].dist);
+});
+
+
 
 

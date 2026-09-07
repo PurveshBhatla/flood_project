@@ -202,6 +202,20 @@ test('12. Haversine Distance Calculation & Nearest Safe Shelters Sorting', () =>
   assert.ok(sortedSafe[0].dist < sortedSafe[1].dist);
 });
 
+test('13. WeatherService Rainfall Forecast & Early Rain Alert Pipeline', async () => {
+  const { WeatherService } = require('../lib/services/weather.service');
+  const weather = await WeatherService.getWeather(19.076, 72.8777);
+
+  assert.ok(weather.forecast, 'Weather data must contain forecast object');
+  assert.ok(weather.forecast.hourly.length === 7, 'Forecast must contain 7 hourly steps (0h to 6h)');
+  assert.ok(weather.forecast.next1hMmHr >= 0);
+  assert.ok(weather.forecast.next3hPeakMmHr >= 0);
+  assert.ok(weather.forecast.next6hPeakMmHr >= 0);
+  assert.ok(weather.forecast.warningTitle, 'Forecast warning title must be defined');
+  assert.ok(['live', 'demo'].includes(weather.forecast.mode));
+});
+
+
 
 
 

@@ -27,6 +27,7 @@ import {
 
 import RainfallGlobe from '@/components/3d/rainfall-globe';
 import RescueResourcesCard from '@/components/dashboard/rescue-resources-card';
+import RainfallForecastCard from '@/components/dashboard/rainfall-forecast-card';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -226,6 +227,12 @@ export default function DashboardPage() {
 
       {/* RESCUE RESOURCES AVAILABLE DASHBOARD FEATURE */}
       <RescueResourcesCard data={resourceData} />
+
+      {/* RAINFALL FORECAST & EARLY RAIN ALERT FEATURE */}
+      <RainfallForecastCard
+        forecast={weather?.forecast}
+        locationName={selectedLocation?.name}
+      />
 
       {/* Middle Row: Recharts & Alerts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

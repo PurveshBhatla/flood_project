@@ -156,4 +156,18 @@ test('10. HeavyRainfallDetectionService Filters & Sorts Hotspots', () => {
   assert.equal(hotspots[1].name, 'Bhubaneswar');
 });
 
+test('11. RescueResourceService Emergency Availability Feed', async () => {
+  const { RescueResourceService } = require('../lib/services/rescue-resource.service');
+  const data = await RescueResourceService.getResources(19.076, 72.8777);
+  assert.ok(['live', 'demo'].includes(data.mode));
+  assert.ok(data.summary.ambulances.count >= 0);
+  assert.ok(data.summary.rescueTeams.count >= 0);
+  assert.ok(data.summary.shelters.count >= 0);
+  assert.ok(data.summary.rescueBoats.count >= 0);
+  assert.ok(data.resources.length > 0);
+  assert.ok(data.resources[0].latitude);
+  assert.ok(data.resources[0].longitude);
+});
+
+
 

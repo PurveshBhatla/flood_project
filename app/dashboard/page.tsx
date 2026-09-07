@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 
 import RainfallGlobe from '@/components/3d/rainfall-globe';
+import RescueResourcesCard from '@/components/dashboard/rescue-resources-card';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -37,6 +38,7 @@ export default function DashboardPage() {
   const [prediction, setPrediction] = useState<any>(null);
   const [alerts, setAlerts] = useState<any[]>([]);
   const [rainfallData, setRainfallData] = useState<any>(null);
+  const [resourceData, setResourceData] = useState<any>(null);
   const [loadingData, setLoadingData] = useState(true);
 
   useEffect(() => {
@@ -53,6 +55,13 @@ export default function DashboardPage() {
       if (rainRes.ok) {
         const rainJson = await rainRes.json();
         setRainfallData(rainJson);
+      }
+
+      // Fetch Available Rescue Resources Summary
+      const resRes = await fetch('/api/resources/available');
+      if (resRes.ok) {
+        const resJson = await resRes.json();
+        setResourceData(resJson);
       }
 
       const locRes = await fetch('/api/locations');
@@ -214,6 +223,9 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* RESCUE RESOURCES AVAILABLE DASHBOARD FEATURE */}
+      <RescueResourcesCard data={resourceData} />
 
       {/* Middle Row: Recharts & Alerts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

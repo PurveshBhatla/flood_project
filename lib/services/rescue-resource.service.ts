@@ -5,6 +5,8 @@ export interface RescueResourceItem {
   category: string;
   iconName: string;
   count: number;
+  availableSpaces?: number;
+  capacity?: number;
   status: 'AVAILABLE' | 'LIMITED' | 'UNAVAILABLE';
   color: 'GREEN' | 'YELLOW' | 'RED';
   latitude: number;
@@ -12,9 +14,11 @@ export interface RescueResourceItem {
   city: string;
   state: string;
   locationName: string;
+  address?: string;
   contactPhone?: string;
   capacityDetails?: string;
   totalCapacity?: number;
+  dataMode?: 'DEMO' | 'LIVE';
 }
 
 export interface RescueResourceSummary {
@@ -24,9 +28,9 @@ export interface RescueResourceSummary {
     ambulances: { count: number; status: 'AVAILABLE' | 'LIMITED' | 'UNAVAILABLE'; label: string };
     rescueTeams: { count: number; status: 'AVAILABLE' | 'LIMITED' | 'UNAVAILABLE'; label: string };
     shelters: { count: number; totalCapacity: number; status: 'AVAILABLE' | 'LIMITED' | 'UNAVAILABLE'; label: string };
-    rescueBoats: { count: number; status: 'AVAILABLE' | 'LIMITED' | 'UNAVAILABLE'; label: string };
-    hospitals: { count: number; status: 'AVAILABLE' | 'LIMITED' | 'UNAVAILABLE'; label: string };
-    supplyKits: { count: number; status: 'AVAILABLE' | 'LIMITED' | 'UNAVAILABLE'; label: string };
+    rescueBoats: { count: number; status: 'LIMITED', label: string };
+    hospitals: { count: number; status: 'AVAILABLE'; label: string };
+    supplyKits: { count: number; status: 'AVAILABLE'; label: string };
   };
   resources: RescueResourceItem[];
 }
@@ -65,96 +69,117 @@ export class DemoRescueResourceProvider implements RescueResourceProvider {
   async getResources(lat: number = 19.076, lng: number = 72.8777): Promise<RescueResourceSummary> {
     const nowIso = new Date().toISOString();
 
+    // Deterministic demo shelters
     const sampleResources: RescueResourceItem[] = [
       {
-        id: 'res-sh-1',
+        id: 'sh-demo-1',
         type: 'SHELTER',
-        name: 'Community Relief & Evacuation Center',
+        name: 'Community Relief Center',
         category: 'Relief Shelter',
-        iconName: '⛺',
-        count: 350,
+        iconName: '🏠',
+        count: 120,
+        availableSpaces: 120,
+        capacity: 250,
+        totalCapacity: 250,
         status: 'AVAILABLE',
         color: 'GREEN',
         latitude: lat + 0.012,
         longitude: lng - 0.008,
-        city: 'Local Region',
-        state: 'State Command',
-        locationName: 'North Civil Lines, District Hub',
+        city: 'Demo Region',
+        state: 'State Disaster Mgmt',
+        locationName: 'Civil Lines Relief Hub, Sector 2',
+        address: '12 Emergency Sector Road, District Center',
         contactPhone: '022-2640-1080',
-        capacityDetails: '350 Available / 500 Total Beds, Food Kits, First-Aid Standby',
-        totalCapacity: 500,
+        capacityDetails: '120 Spaces Available / 250 Total Beds',
+        dataMode: 'DEMO',
       },
       {
-        id: 'res-sh-2',
+        id: 'sh-demo-2',
         type: 'SHELTER',
-        name: 'Government Model High School Evacuation Camp',
+        name: 'Government Relief Camp',
         category: 'Relief Shelter',
-        iconName: '⛺',
-        count: 180,
+        iconName: '🏠',
+        count: 75,
+        availableSpaces: 75,
+        capacity: 300,
+        totalCapacity: 300,
         status: 'AVAILABLE',
         color: 'GREEN',
         latitude: lat + 0.024,
         longitude: lng + 0.015,
-        city: 'Local Region',
-        state: 'State Command',
-        locationName: 'Central Sector 4, Educational Zone',
+        city: 'Demo Region',
+        state: 'State Disaster Mgmt',
+        locationName: 'Central Model School, Station Road',
+        address: '45 Station Road, Model Town',
         contactPhone: '022-2652-4411',
-        capacityDetails: '180 Available / 300 Capacity, Emergency Power Backups',
-        totalCapacity: 300,
+        capacityDetails: '75 Spaces Available / 300 Capacity',
+        dataMode: 'DEMO',
       },
       {
-        id: 'res-sh-3',
+        id: 'sh-demo-3',
         type: 'SHELTER',
-        name: 'District Indoor Sports Stadium Relief Complex',
+        name: 'Relief School (Flood Relief Center)',
         category: 'Relief Shelter',
-        iconName: '⛺',
-        count: 620,
-        status: 'AVAILABLE',
-        color: 'GREEN',
-        latitude: lat - 0.018,
-        longitude: lng - 0.022,
-        city: 'Local Region',
-        state: 'State Command',
-        locationName: 'Stadium Road Complex',
-        contactPhone: '022-2845-9922',
-        capacityDetails: '620 Available / 1000 Total Capacity, Medical Bay',
-        totalCapacity: 1000,
-      },
-      {
-        id: 'res-sh-4',
-        type: 'SHELTER',
-        name: 'St. Jude Emergency Flood Refuge Center',
-        category: 'Relief Shelter',
-        iconName: '⛺',
-        count: 25,
+        iconName: '🏠',
+        count: 15,
+        availableSpaces: 15,
+        capacity: 200,
+        totalCapacity: 200,
         status: 'LIMITED',
         color: 'YELLOW',
         latitude: lat + 0.035,
         longitude: lng - 0.018,
-        city: 'Local Region',
-        state: 'State Command',
-        locationName: 'East Hill Campus',
+        city: 'Demo Region',
+        state: 'State Disaster Mgmt',
+        locationName: 'St. Mary Educational Campus',
+        address: '88 East Hill Highway',
         contactPhone: '022-2433-1100',
-        capacityDetails: '25 Available / 250 Total Capacity (Near Full)',
-        totalCapacity: 250,
+        capacityDetails: '15 Spaces Available / 200 Capacity (LIMITED CAPACITY)',
+        dataMode: 'DEMO',
       },
       {
-        id: 'res-sh-5',
+        id: 'sh-demo-4',
+        type: 'SHELTER',
+        name: 'District Sports Complex Emergency Shelter',
+        category: 'Relief Shelter',
+        iconName: '🏠',
+        count: 450,
+        availableSpaces: 450,
+        capacity: 1000,
+        totalCapacity: 1000,
+        status: 'AVAILABLE',
+        color: 'GREEN',
+        latitude: lat - 0.018,
+        longitude: lng - 0.022,
+        city: 'Demo Region',
+        state: 'State Disaster Mgmt',
+        locationName: 'Stadium Road Complex',
+        address: '100 Sports Complex Drive',
+        contactPhone: '022-2845-9922',
+        capacityDetails: '450 Spaces Available / 1000 Total Capacity',
+        dataMode: 'DEMO',
+      },
+      {
+        id: 'sh-demo-5',
         type: 'SHELTER',
         name: 'Civic Community Auditorium Shelter',
         category: 'Relief Shelter',
-        iconName: '⛺',
+        iconName: '🏠',
         count: 0,
+        availableSpaces: 0,
+        capacity: 150,
+        totalCapacity: 150,
         status: 'UNAVAILABLE',
         color: 'RED',
         latitude: lat - 0.028,
         longitude: lng + 0.032,
-        city: 'Local Region',
-        state: 'State Command',
+        city: 'Demo Region',
+        state: 'State Disaster Mgmt',
         locationName: 'Old Market Square',
+        address: '5 Market Square Lane',
         contactPhone: '022-2510-7744',
-        capacityDetails: 'FULL (0 Spaces Available / 400 Occupied)',
-        totalCapacity: 400,
+        capacityDetails: 'FULL (0 Spaces Available / 150 Capacity)',
+        dataMode: 'DEMO',
       },
       {
         id: 'res-sh-6',

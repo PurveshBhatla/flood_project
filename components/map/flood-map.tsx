@@ -75,25 +75,25 @@ const shelterIcon = (color: string, isNearest: boolean = false) =>
     html: `
       <div style="
         background-color: ${color};
-        width: ${isNearest ? '36px' : '28px'};
-        height: ${isNearest ? '36px' : '28px'};
+        width: ${isNearest ? '36px' : '30px'};
+        height: ${isNearest ? '36px' : '30px'};
         border-radius: 50%;
         border: ${isNearest ? '3px solid #ffffff' : '2px solid #ffffff'};
         box-shadow: ${
           isNearest
-            ? '0 0 0 4px rgba(16, 185, 129, 0.4), 0 4px 14px rgba(0,0,0,0.6)'
+            ? '0 0 0 5px rgba(16, 185, 129, 0.5), 0 4px 14px rgba(0,0,0,0.6)'
             : '0 4px 10px rgba(0,0,0,0.4)'
         };
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: ${isNearest ? '18px' : '14px'};
+        font-size: ${isNearest ? '18px' : '15px'};
       ">
-        ⛺
+        🏠
       </div>
     `,
-    iconSize: [isNearest ? 36 : 28, isNearest ? 36 : 28],
-    iconAnchor: [isNearest ? 18 : 14, isNearest ? 18 : 14],
+    iconSize: [isNearest ? 36 : 30, isNearest ? 36 : 30],
+    iconAnchor: [isNearest ? 18 : 15, isNearest ? 18 : 15],
   });
 
 const userLocationIcon = (isGps: boolean) =>
@@ -161,11 +161,6 @@ export default function FloodMap() {
 
   // Judge Demo Simulation Mode
   const [isSimulating, setIsSimulating] = useState(false);
-
-  // Routing State
-  const [showRoutingDrawer, setShowRoutingDrawer] = useState(false);
-  const [routeResult, setRouteResult] = useState<any>(null);
-  const [loadingRoute, setLoadingRoute] = useState(false);
 
   // Hotspots Drawer State
   const [showHotspotPanel, setShowHotspotPanel] = useState(true);
@@ -304,7 +299,6 @@ export default function FloodMap() {
       .map((shelter: any) => {
         const distKm = haversineDistance(refLat, refLng, shelter.latitude, shelter.longitude);
 
-        // Check if shelter area is endangered by heavy flood / extreme rainfall
         let hasFloodRisk = false;
 
         if (rainfallData?.cells) {
@@ -336,7 +330,7 @@ export default function FloodMap() {
         }
 
         let safetyCategory: 'SAFE' | 'LIMITED' | 'FULL' | 'FLOOD_RISK' = 'SAFE';
-        let safetyBadge = '🟢 SAFE / AVAILABLE';
+        let safetyBadge = '🟢 AVAILABLE';
         let badgeClass = 'bg-emerald-500 text-white';
         let markerColor = '#10b981';
         let isSafe = true;
@@ -380,7 +374,7 @@ export default function FloodMap() {
   }, [processedShelters]);
 
   const nearestSafeShelters = useMemo(() => {
-    return safeShelters.slice(0, 5);
+    return safeShelters.slice(0, 3);
   }, [safeShelters]);
 
   // Handle Browser Geolocation ("Use My Location")
@@ -400,7 +394,7 @@ export default function FloodMap() {
           console.warn('Geolocation error:', err);
           setLocatingUser(false);
           alert(
-            'GPS location permission denied or unavailable. You can click anywhere on the map to set a location manually.'
+            'GPS location permission denied or unavailable. Click anywhere on the map to set a location manually.'
           );
         },
         { timeout: 10000, maximumAge: 60000 }
@@ -524,6 +518,30 @@ export default function FloodMap() {
           </button>
         </form>
 
+        {/* 🏠 Prominent "Nearest Safe Shelters" Map Control Button */}
+        <button
+          onClick={() => {
+            const nextState = !showShelterPanel;
+            setShowShelterPanel(nextState);
+            if (nextState) {
+              setLayers((prev) => ({ ...prev, shelters: true }));
+              if (processedShelters.length > 0) {
+                const topShelter = processedShelters[0];
+                setCenter([topShelter.latitude, topShelter.longitude]);
+                setZoomLevel(13);
+              }
+            }
+          }}
+          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-extrabold rounded-xl transition-all shadow-lg shrink-0 border ${
+            showShelterPanel
+              ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-400 ring-2 ring-emerald-500/40'
+              : 'bg-background/95 backdrop-blur-md border-border hover:bg-muted text-foreground'
+          }`}
+        >
+          <span className="text-base">🏠</span>
+          <span>Nearest Safe Shelters</span>
+        </button>
+
         {/* Use My Location Button */}
         <button
           onClick={handleGetLocation}
@@ -533,19 +551,6 @@ export default function FloodMap() {
         >
           <Locate className={`h-4 w-4 ${locatingUser ? 'animate-spin' : ''}`} />
           {locatingUser ? 'Locating...' : 'Use My Location'}
-        </button>
-
-        {/* Toggle Nearest Safe Shelters Panel */}
-        <button
-          onClick={() => setShowShelterPanel(!showShelterPanel)}
-          className={`flex items-center gap-1.5 px-3 py-2 border text-xs font-bold rounded-xl shadow transition-all shrink-0 ${
-            showShelterPanel
-              ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500'
-              : 'bg-background/95 backdrop-blur-md border-border hover:bg-muted text-foreground'
-          }`}
-        >
-          <Tent className="h-4 w-4 text-emerald-400" />
-          Nearest Shelters
         </button>
 
         {/* Map Reset View to India Overview */}
@@ -579,7 +584,7 @@ export default function FloodMap() {
               </span>
               <label className="flex items-center justify-between text-xs cursor-pointer hover:bg-muted/50 p-1 rounded">
                 <span className="flex items-center gap-2 font-medium">
-                  <Tent className="h-3.5 w-3.5 text-emerald-500" /> Safe Relief Shelters
+                  <span className="text-sm">🏠</span> Safe Relief Shelters
                 </span>
                 <input
                   type="checkbox"
@@ -654,36 +659,31 @@ export default function FloodMap() {
         </button>
       </div>
 
-      {/* ⛺ NEAREST SAFE SHELTERS OVERLAY PANEL (FLOATING RIGHT SIDE / TOP-RIGHT) */}
+      {/* 🏠 NEAREST SAFE SHELTERS PANEL */}
       {showShelterPanel && (
         <div className="absolute top-16 right-4 z-[400] w-72 sm:w-96 bg-background/95 backdrop-blur-md border border-border rounded-2xl shadow-2xl overflow-hidden">
           <div className="p-3 bg-emerald-500/10 border-b border-emerald-500/20 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Tent className="h-4 w-4 text-emerald-500" />
-              <span className="font-extrabold text-xs uppercase tracking-wider text-foreground flex items-center gap-1.5">
-                Nearest Safe Shelters
+              <span className="text-base">🏠</span>
+              <span className="font-extrabold text-xs uppercase tracking-wider text-foreground">
+                NEAREST SAFE SHELTERS
               </span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="px-2 py-0.5 rounded text-[9px] font-extrabold uppercase bg-amber-500/20 text-amber-600 border border-amber-500/40">
-                {shelterSummary?.mode === 'live' ? '● LIVE SHELTERS' : '● DEMO SHELTER DATA'}
-              </span>
-              <button
-                onClick={() => setShowShelterPanel(false)}
-                className="text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-muted"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+            <button
+              onClick={() => setShowShelterPanel(false)}
+              className="text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-muted"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
 
-          <div className="p-3 space-y-2 max-h-[26rem] overflow-y-auto text-xs">
-            {/* Active Reference Point Subheader */}
+          <div className="p-3 space-y-2.5 max-h-[26rem] overflow-y-auto text-xs">
+            {/* Reference Location Row */}
             <div className="p-2 rounded-xl bg-muted/60 border border-border flex items-center justify-between text-[11px]">
               <div className="flex items-center gap-1.5 text-muted-foreground">
                 <Navigation className="h-3.5 w-3.5 text-brand-600 shrink-0" />
                 <span>
-                  From:{' '}
+                  Reference:{' '}
                   <strong className="text-foreground">
                     {activeLocationType === 'GPS'
                       ? 'Your GPS Location'
@@ -695,9 +695,10 @@ export default function FloodMap() {
               </div>
               <button
                 onClick={handleGetLocation}
-                className="text-[10px] text-cyan-600 dark:text-cyan-400 font-extrabold hover:underline"
+                disabled={locatingUser}
+                className="px-2 py-1 rounded bg-cyan-600 hover:bg-cyan-700 text-white font-extrabold text-[10px] transition-colors"
               >
-                {locatingUser ? 'Locating...' : 'GPS Location'}
+                {locatingUser ? 'Locating...' : 'Use My Location'}
               </button>
             </div>
 
@@ -708,86 +709,57 @@ export default function FloodMap() {
               </div>
             ) : nearestSafeShelters.length > 0 ? (
               <>
-                <div className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider flex items-center justify-between pt-1 pb-0.5">
-                  <span>Top Recommended Safe Places ({nearestSafeShelters.length})</span>
-                  <span className="text-emerald-500 font-extrabold">SORTED BY DISTANCE</span>
-                </div>
-
                 {nearestSafeShelters.map((shelter: any, idx: number) => {
                   const isTopRank = idx === 0;
                   const isSelected = selectedShelterId === shelter.id;
 
                   return (
-                    <div
+                    <button
                       key={shelter.id}
-                      className={`p-3 rounded-xl border transition-all space-y-2 ${
+                      onClick={() => handleFocusShelter(shelter)}
+                      className={`w-full text-left p-3 rounded-xl border transition-all space-y-2 ${
                         isSelected
                           ? 'bg-emerald-500/10 border-emerald-500 ring-2 ring-emerald-500/30 shadow-md'
                           : isTopRank
-                          ? 'bg-card border-emerald-500/60 shadow-sm'
+                          ? 'bg-card border-emerald-500/60 shadow-sm hover:border-emerald-500'
                           : 'bg-card border-border hover:border-muted-foreground/40'
                       }`}
                     >
-                      {/* Title & Rank Header */}
                       <div className="flex items-start justify-between gap-2">
                         <div className="space-y-0.5">
-                          {isTopRank && (
-                            <span className="inline-flex items-center gap-1 text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-emerald-500 text-white mb-1">
-                              <ShieldCheck className="h-3 w-3" /> #1 Nearest Safe Shelter
-                            </span>
-                          )}
-                          <h4 className="font-extrabold text-foreground text-xs leading-snug">
-                            {shelter.name}
+                          <h4 className="font-extrabold text-foreground text-xs leading-snug flex items-center gap-1.5">
+                            🏠 {shelter.name}
                           </h4>
                           <p className="text-[11px] text-muted-foreground">
-                            {shelter.locationName || shelter.city}
+                            {shelter.address || shelter.locationName}
                           </p>
                         </div>
                         <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold shrink-0 ${shelter.badgeClass}`}>
-                          {shelter.safetyCategory === 'SAFE'
-                            ? '🟢 SAFE'
-                            : shelter.safetyCategory === 'LIMITED'
+                          {shelter.status === 'AVAILABLE'
+                            ? '🟢 AVAILABLE'
+                            : shelter.status === 'LIMITED'
                             ? '🟡 LIMITED'
                             : '🔴 FULL'}
                         </span>
                       </div>
 
-                      {/* Distance & Availability Grid */}
-                      <div className="grid grid-cols-2 gap-2 p-2 rounded-lg bg-muted/40 text-[11px]">
+                      <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1 border-t border-border/40">
                         <div>
-                          <span className="text-muted-foreground block text-[10px]">Calculated Distance</span>
-                          <strong className="text-brand-600 dark:text-brand-400 font-extrabold text-xs">
+                          Distance:{' '}
+                          <strong className="text-brand-600 dark:text-brand-400 font-extrabold">
                             {shelter.distanceKm < 1
                               ? `${Math.round(shelter.distanceKm * 1000)} m`
                               : `${shelter.distanceKm.toFixed(1)} km`}
                           </strong>
                         </div>
                         <div>
-                          <span className="text-muted-foreground block text-[10px]">Available Spaces</span>
-                          <strong className="text-foreground font-extrabold text-xs">
-                            {shelter.count} / {shelter.totalCapacity || shelter.count + 150} beds
+                          Available:{' '}
+                          <strong className="text-foreground font-extrabold">
+                            {shelter.availableSpaces ?? shelter.count} spaces available
                           </strong>
                         </div>
                       </div>
-
-                      {/* Action buttons */}
-                      <div className="flex items-center justify-between pt-1 gap-2 border-t border-border/40">
-                        <button
-                          onClick={() => handleFocusShelter(shelter)}
-                          className="flex-1 py-1 px-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-[11px] font-bold flex items-center justify-center gap-1 transition-colors"
-                        >
-                          <MapPin className="h-3 w-3" /> View on Map
-                        </button>
-                        <a
-                          href={`https://www.google.com/maps/dir/?api=1&destination=${shelter.latitude},${shelter.longitude}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="py-1 px-2.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground border border-border text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors"
-                        >
-                          <ExternalLink className="h-3 w-3 text-muted-foreground" /> Directions
-                        </a>
-                      </div>
-                    </div>
+                    </button>
                   );
                 })}
               </>
@@ -796,10 +768,15 @@ export default function FloodMap() {
                 <AlertTriangle className="h-6 w-6 text-red-500 mx-auto" />
                 <span className="font-extrabold text-xs block">No nearby safe shelter found.</span>
                 <p className="text-[11px] text-muted-foreground leading-snug">
-                  Immediate surrounding shelters are either full or located in high flood-risk zones. Expand map area or check higher terrain locations.
+                  Click anywhere on the map to set a location and calculate nearest safe shelters.
                 </p>
               </div>
             )}
+
+            {/* Bottom Demo Warning Label */}
+            <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-extrabold text-center uppercase tracking-wide">
+              ⚠ DEMO SHELTER DATA
+            </div>
           </div>
         </div>
       )}
@@ -1012,7 +989,7 @@ export default function FloodMap() {
           </Marker>
         )}
 
-        {/* ⛺ SAFE RELIEF SHELTER MARKERS ON MAP */}
+        {/* 🏠 SAFE RELIEF SHELTER MARKERS ON MAP */}
         {layers.shelters &&
           processedShelters.map((shelter: any) => {
             const isTopNearest = nearestSafeShelters[0]?.id === shelter.id;
@@ -1027,10 +1004,10 @@ export default function FloodMap() {
                 }}
               >
                 <Popup>
-                  <div className="p-2 space-y-2 text-xs min-w-[230px]">
+                  <div className="p-2 space-y-2 text-xs min-w-[240px]">
                     <div className="flex items-center justify-between border-b border-border pb-1">
-                      <span className="font-extrabold text-foreground flex items-center gap-1 text-xs">
-                        ⛺ {shelter.name}
+                      <span className="font-extrabold text-foreground text-sm flex items-center gap-1.5">
+                        🏠 {shelter.name}
                       </span>
                     </div>
 
@@ -1040,35 +1017,40 @@ export default function FloodMap() {
                       </span>
                     )}
 
-                    <div className="space-y-1 text-muted-foreground text-[11px]">
+                    <div className="space-y-1.5 text-muted-foreground text-[11px]">
                       <div>
-                        Safety Status: <strong className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold ${shelter.badgeClass}`}>{shelter.safetyBadge}</strong>
+                        Address: <strong className="text-foreground">{shelter.address || shelter.locationName}</strong>
                       </div>
                       <div>
                         Calculated Distance:{' '}
-                        <strong className="text-brand-600 dark:text-brand-400 font-extrabold">
+                        <strong className="text-brand-600 dark:text-brand-400 font-extrabold text-xs">
                           {shelter.distanceKm < 1
                             ? `${Math.round(shelter.distanceKm * 1000)} m`
-                            : `${shelter.distanceKm.toFixed(2)} km`}
+                            : `${shelter.distanceKm.toFixed(1)} km`}
                         </strong>
                       </div>
                       <div>
-                        Available Spaces:{' '}
-                        <strong className="text-foreground">
-                          {shelter.count} beds (Capacity: {shelter.totalCapacity || shelter.count + 150})
-                        </strong>
+                        Capacity: <strong className="text-foreground">{shelter.capacity || shelter.totalCapacity || 250}</strong>
                       </div>
                       <div>
-                        Location: <strong className="text-foreground">{shelter.locationName}</strong>
+                        Available Spaces: <strong className="text-foreground">{shelter.availableSpaces ?? shelter.count}</strong>
                       </div>
-                      {shelter.contactPhone && (
-                        <div>
-                          Emergency Phone: <strong className="text-foreground">{shelter.contactPhone}</strong>
-                        </div>
-                      )}
+                      <div className="flex items-center justify-between pt-1">
+                        <span>Status:</span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${shelter.badgeClass}`}>
+                          {shelter.status === 'AVAILABLE'
+                            ? '🟢 AVAILABLE'
+                            : shelter.status === 'LIMITED'
+                            ? '🟡 LIMITED'
+                            : '🔴 FULL'}
+                        </span>
+                      </div>
+                      <div className="pt-1 border-t border-border flex items-center justify-between text-[10px] text-amber-500 font-extrabold uppercase">
+                        <span>Data: DEMO SHELTER DATA</span>
+                      </div>
                     </div>
 
-                    <div className="pt-1.5 border-t border-border flex items-center justify-between gap-2">
+                    <div className="pt-1">
                       <a
                         href={`https://www.google.com/maps/dir/?api=1&destination=${shelter.latitude},${shelter.longitude}`}
                         target="_blank"

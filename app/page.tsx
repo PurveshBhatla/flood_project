@@ -185,7 +185,7 @@ export default function HomePage() {
           </div>
 
           <div className="h-[450px] w-full rounded-2xl overflow-hidden shadow-xl border border-border">
-            <MapWrapper initialCenter={[19.076, 72.8777]} initialZoom={5} interactive={true} />
+            <MapWrapper />
           </div>
         </div>
       </section>

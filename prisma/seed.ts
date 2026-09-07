@@ -4,9 +4,14 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Starting FloodVision database seed...');
+  console.log('🌱 Starting SIH26085 FloodVision Master Database Seed...');
 
-  // Clean existing data
+  // Clean existing tables
+  await prisma.floodPredictionRecord.deleteMany({});
+  await prisma.roadSegment.deleteMany({});
+  await prisma.road.deleteMany({});
+  await prisma.drainEdge.deleteMany({});
+  await prisma.drainNode.deleteMany({});
   await prisma.notification.deleteMany({});
   await prisma.floodAlert.deleteMany({});
   await prisma.floodRisk.deleteMany({});
@@ -17,7 +22,7 @@ async function main() {
   await prisma.weatherData.deleteMany({});
   await prisma.contactMessage.deleteMany({});
 
-  // 1. Create Users
+  // 1. Users
   const adminPasswordHash = await bcrypt.hash('Admin@123456', 10);
   const userPasswordHash = await bcrypt.hash('User@123456', 10);
 
@@ -39,10 +44,10 @@ async function main() {
     },
   });
 
-  console.log('✅ Created users: admin@floodvision.org, user@floodvision.org');
+  console.log('✅ Created users');
 
-  // 2. Create Monitored Locations for Demo User
-  const MumbaiLocation = await prisma.location.create({
+  // 2. Monitored User Locations
+  const mumbaiLoc = await prisma.location.create({
     data: {
       userId: demoUser.id,
       name: 'Mithi River Basin, Mumbai',
@@ -55,7 +60,7 @@ async function main() {
     },
   });
 
-  const KeralaLocation = await prisma.location.create({
+  const keralaLoc = await prisma.location.create({
     data: {
       userId: demoUser.id,
       name: 'Periyar River Basin, Aluva',
@@ -68,7 +73,7 @@ async function main() {
     },
   });
 
-  const AssamLocation = await prisma.location.create({
+  const assamLoc = await prisma.location.create({
     data: {
       userId: demoUser.id,
       name: 'Brahmaputra Valley, Guwahati',
@@ -81,9 +86,113 @@ async function main() {
     },
   });
 
-  console.log('✅ Created monitored locations for demo user');
+  // 3. Roads & Road Segments (GIS Topology)
+  const ringRoad = await prisma.road.create({
+    data: {
+      name: 'Central Ring Road & BKC Junction',
+      category: 'ARTERIAL',
+      geometryJson: JSON.stringify([
+        [72.865, 19.065],
+        [72.872, 19.072],
+        [72.8777, 19.076],
+        [72.885, 19.082],
+      ]),
+      elevation: 6.2, // Low lying basin
+      slope: 0.8,
+    },
+  });
 
-  // 3. Seed Monitoring Stations
+  const lbsMarg = await prisma.road.create({
+    data: {
+      name: 'LBS Marg Corridor',
+      category: 'HIGHWAY',
+      geometryJson: JSON.stringify([
+        [72.88, 19.07],
+        [72.885, 19.078],
+        [72.89, 19.085],
+      ]),
+      elevation: 7.5,
+      slope: 1.2,
+    },
+  });
+
+  const marineDrive = await prisma.road.create({
+    data: {
+      name: 'Marine Coastal Expressway',
+      category: 'HIGHWAY',
+      geometryJson: JSON.stringify([
+        [72.82, 18.94],
+        [72.825, 18.95],
+        [72.83, 18.96],
+      ]),
+      elevation: 14.5, // High coastal ridge
+      slope: 3.5,
+    },
+  });
+
+  const seg1 = await prisma.roadSegment.create({
+    data: {
+      roadId: ringRoad.id,
+      startLat: 19.065,
+      startLng: 72.865,
+      endLat: 19.076,
+      endLng: 72.8777,
+      lengthMeters: 1450,
+      surfaceType: 'ROAD',
+    },
+  });
+
+  const seg2 = await prisma.roadSegment.create({
+    data: {
+      roadId: lbsMarg.id,
+      startLat: 19.07,
+      startLng: 72.88,
+      endLat: 19.085,
+      endLng: 72.89,
+      lengthMeters: 2100,
+      surfaceType: 'CONCRETE',
+    },
+  });
+
+  console.log('✅ Created GIS roads & segments');
+
+  // 4. Drainage Network Graph
+  const nodeA = await prisma.drainNode.create({
+    data: {
+      name: 'BKC Manhole Inlet 01',
+      type: 'INLET',
+      latitude: 19.068,
+      longitude: 72.869,
+      elevation: 6.5,
+      capacityM3s: 12.5,
+    },
+  });
+
+  const nodeB = await prisma.drainNode.create({
+    data: {
+      name: 'Mithi River Outfall Canal',
+      type: 'OUTFALL',
+      latitude: 19.076,
+      longitude: 72.8777,
+      elevation: 5.2,
+      capacityM3s: 25.0,
+    },
+  });
+
+  await prisma.drainEdge.create({
+    data: {
+      fromNodeId: nodeA.id,
+      toNodeId: nodeB.id,
+      diameterM: 1.5,
+      lengthM: 850,
+      capacityM3s: 14.2,
+      roughnessN: 0.013,
+    },
+  });
+
+  console.log('✅ Created drainage network graph');
+
+  // 5. Monitoring Stations
   await prisma.monitoringStation.createMany({
     data: [
       {
@@ -113,91 +222,33 @@ async function main() {
         criticalLevel: 50.5,
         status: 'CRITICAL',
       },
-      {
-        name: 'Houston Bayou Gauge 12 (Buffalo Bayou)',
-        latitude: 29.7604,
-        longitude: -95.3698,
-        waterLevel: 2.1,
-        warningLevel: 3.8,
-        criticalLevel: 5.2,
-        status: 'OPERATIONAL',
-      },
-      {
-        name: 'Thames Barrier Telemetry Stn',
-        latitude: 51.4975,
-        longitude: 0.0369,
-        waterLevel: 1.8,
-        warningLevel: 3.0,
-        criticalLevel: 4.5,
-        status: 'OPERATIONAL',
-      },
     ],
   });
 
-  console.log('✅ Created monitoring stations');
-
-  // 4. Seed Flood Alerts
+  // 6. Flood Alerts
   const alert1 = await prisma.floodAlert.create({
     data: {
       title: 'CRITICAL: Severe Flood Warning for Brahmaputra Basin',
       description:
-        'Continuous torrential heavy rainfall (140mm in 24h) has elevated river gauge levels near Pandu Ghat above danger marks. Immediate evacuation recommended for riverside settlements.',
+        'Torrential rainfall nowcast (72mm/h) combined with surcharged drainage has elevated river levels above danger marks. Immediate evacuation recommended.',
       severity: 'CRITICAL',
       latitude: 26.1445,
       longitude: 91.7362,
       radiusKm: 25.0,
       affectedArea: 'Kamrup Metropolitan, Assam',
-      expiresAt: new Date(Date.now() + 86400000 * 3), // +3 days
+      expiresAt: new Date(Date.now() + 86400000 * 3),
     },
   });
 
-  const alert2 = await prisma.floodAlert.create({
+  await prisma.notification.create({
     data: {
-      title: 'WARNING: Rising Water Levels in Periyar River',
-      description:
-        'Sluice gates opened at Idamalayar and Idukki dams due to catchment inflow. Low-lying areas in Aluva and Kalamassery advised to remain vigilant.',
-      severity: 'WARNING',
-      latitude: 10.1076,
-      longitude: 76.3516,
-      radiusKm: 15.0,
-      affectedArea: 'Ernakulam District, Kerala',
-      expiresAt: new Date(Date.now() + 86400000 * 2), // +2 days
+      userId: demoUser.id,
+      alertId: alert1.id,
+      read: false,
     },
   });
 
-  const alert3 = await prisma.floodAlert.create({
-    data: {
-      title: 'MODERATE: Urban Flash Flood Watch for Central Mumbai',
-      description:
-        'High tide coinciding with intense rainfall spalls may cause waterlogging in Kurla, Sion, and Dadar. Drainage pumps activated.',
-      severity: 'WARNING',
-      latitude: 19.076,
-      longitude: 72.8777,
-      radiusKm: 12.0,
-      affectedArea: 'Mumbai Suburban District',
-      expiresAt: new Date(Date.now() + 86400000 * 1), // +1 day
-    },
-  });
-
-  console.log('✅ Created active flood alerts');
-
-  // 5. User Notifications
-  await prisma.notification.createMany({
-    data: [
-      {
-        userId: demoUser.id,
-        alertId: alert3.id,
-        read: false,
-      },
-      {
-        userId: demoUser.id,
-        alertId: alert2.id,
-        read: true,
-      },
-    ],
-  });
-
-  // 6. Seed Historical Flood Events
+  // 7. Historical Events
   await prisma.floodEvent.createMany({
     data: [
       {
@@ -206,17 +257,8 @@ async function main() {
         longitude: 91.7362,
         severity: 'CRITICAL',
         description: 'Widespread monsoon deluge affecting 2.4 million residents across 28 districts.',
-        impact: '350,000 hectares of cropland damaged, 120 emergency shelters established.',
+        impact: '350,000 hectares of cropland damaged.',
         date: new Date('2024-07-12'),
-      },
-      {
-        location: 'Great Kerala Deluge 2018',
-        latitude: 10.1076,
-        longitude: 76.3516,
-        severity: 'CRITICAL',
-        description: 'Worst flood in Kerala in a century following abnormally high monsoon rainfall.',
-        impact: 'Severe infrastructure disruption, major reservoir gate discharges.',
-        date: new Date('2018-08-16'),
       },
       {
         location: 'Mumbai Deluge July 2005',
@@ -227,70 +269,10 @@ async function main() {
         impact: 'Complete financial capital shutdown, citywide emergency response.',
         date: new Date('2005-07-26'),
       },
-      {
-        location: 'Hurricane Harvey Houston Inundation 2017',
-        latitude: 29.7604,
-        longitude: -95.3698,
-        severity: 'CRITICAL',
-        description: 'Category 4 storm lingering over Harris county producing 1,000+ mm precipitation.',
-        impact: '30,000 displacement events, historic bayou peak levels.',
-        date: new Date('2017-08-27'),
-      },
     ],
   });
 
-  console.log('✅ Created historical flood records');
-
-  // 7. Seed Initial Flood Risks for User Locations
-  await prisma.floodRisk.createMany({
-    data: [
-      {
-        locationId: MumbaiLocation.id,
-        latitude: 19.076,
-        longitude: 72.8777,
-        riskScore: 62.4,
-        probability: 0.62,
-        riskLevel: 'HIGH',
-        confidence: 0.91,
-        rainfall: 82.5,
-        waterLevel: 4.85,
-        temperature: 28.2,
-        humidity: 88.0,
-        soilMoisture: 78.5,
-      },
-      {
-        locationId: KeralaLocation.id,
-        latitude: 10.1076,
-        longitude: 76.3516,
-        riskScore: 48.0,
-        probability: 0.48,
-        riskLevel: 'MODERATE',
-        confidence: 0.89,
-        rainfall: 42.0,
-        waterLevel: 7.2,
-        temperature: 26.5,
-        humidity: 82.0,
-        soilMoisture: 65.0,
-      },
-      {
-        locationId: AssamLocation.id,
-        latitude: 26.1445,
-        longitude: 91.7362,
-        riskScore: 88.2,
-        probability: 0.88,
-        riskLevel: 'CRITICAL',
-        confidence: 0.95,
-        rainfall: 145.0,
-        waterLevel: 49.8,
-        temperature: 25.0,
-        humidity: 94.0,
-        soilMoisture: 92.0,
-      },
-    ],
-  });
-
-  console.log('✅ Seeded initial flood risks');
-  console.log('🎉 FloodVision Database Seeding Completed Successfully!');
+  console.log('🎉 SIH26085 Master Database Seeding Completed Successfully!');
 }
 
 main()

@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { RainfallNowcastService } from '../lib/services/hydrology/rainfall-nowcast.service.ts';
-import { RunoffService } from '../lib/services/hydrology/runoff.service.ts';
-import { HydraulicService } from '../lib/services/hydrology/hydraulic.service.ts';
-import { SurfaceWaterRoutingService } from '../lib/services/hydrology/surface-routing.service.ts';
-import { FloodPredictionEngine } from '../lib/services/hydrology/flood-prediction.engine.ts';
-import { SafeRoutingService } from '../lib/services/routing/safe-routing.service.ts';
-import { getDepthColor } from '../components/map/flood-map.tsx';
+import { RainfallNowcastService } from '../lib/services/hydrology/rainfall-nowcast.service';
+import { RunoffService } from '../lib/services/hydrology/runoff.service';
+import { HydraulicService } from '../lib/services/hydrology/hydraulic.service';
+import { SurfaceWaterRoutingService } from '../lib/services/hydrology/surface-routing.service';
+import { FloodPredictionEngine } from '../lib/services/hydrology/flood-prediction.engine';
+import { SafeRoutingService } from '../lib/services/routing/safe-routing.service';
+import { getDepthColor } from '../lib/utils';
 
 test('1. Rainfall Nowcast 0-3h Timeline Generation', async () => {
   const nowcast = await RainfallNowcastService.getNowcast(19.076, 72.8777);
@@ -29,8 +29,8 @@ test('3. Manning Hydraulic Capacity & Surcharge Trigger', () => {
   const capacity = HydraulicService.calculateManningCapacity(1.2, 1.0); // D=1.2m, Slope=1%
   assert.ok(capacity > 0);
 
-  // Normal Inflow
-  const normalEval = HydraulicService.evaluateHydraulics(capacity, 5.0);
+  // Normal Inflow (2.0 m3/s < capacity)
+  const normalEval = HydraulicService.evaluateHydraulics(capacity, 2.0);
   assert.equal(normalEval.isSurcharged, false);
 
   // Overloaded Inflow > 100% capacity

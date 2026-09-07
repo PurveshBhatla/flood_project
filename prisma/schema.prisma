@@ -1,4 +1,4 @@
-// Prisma Schema for FloodVision Platform
+// Prisma Schema for FloodVision Platform - SIH26085 Master Upgrade
 
 generator client {
   provider = "prisma-client-js"
@@ -10,14 +10,14 @@ datasource db {
 }
 
 model User {
-  id           String         @id @default(uuid())
-  name         String
-  email        String         @unique
-  passwordHash String
-  role         String         @default("USER") // USER or ADMIN
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  locations    Location[]
+  id            String         @id @default(uuid())
+  name          String
+  email         String         @unique
+  passwordHash  String
+  role          String         @default("USER") // USER or ADMIN
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  locations     Location[]
   notifications Notification[]
 }
 
@@ -122,4 +122,68 @@ model ContactMessage {
   message   String
   status    String   @default("PENDING") // PENDING, RESOLVED
   createdAt DateTime @default(now())
+}
+
+// ==========================================
+// SIH26085 GIS & HYDRAULICS EXTENDED MODELS
+// ==========================================
+
+model Road {
+  id           String        @id @default(uuid())
+  name         String
+  category     String        // HIGHWAY, ARTERIAL, RESIDENTIAL
+  geometryJson String        // GeoJSON LineString [ [lng, lat], ... ]
+  elevation    Float         // meters
+  slope        Float         // percentage
+  segments     RoadSegment[]
+}
+
+model RoadSegment {
+  id           String                  @id @default(uuid())
+  roadId       String
+  road         Road                    @relation(fields: [roadId], references: [id], onDelete: Cascade)
+  startLat     Float
+  startLng     Float
+  endLat       Float
+  endLng       Float
+  lengthMeters Float
+  surfaceType  String                  // ROAD, CONCRETE, PARK, SOIL
+  predictions  FloodPredictionRecord[]
+}
+
+model DrainNode {
+  id            String      @id @default(uuid())
+  name          String
+  type          String      // MANHOLE, INLET, JUNCTION, OUTFALL
+  latitude      Float
+  longitude     Float
+  elevation     Float
+  capacityM3s   Float
+  outgoingEdges DrainEdge[] @relation("FromNode")
+  incomingEdges DrainEdge[] @relation("ToNode")
+}
+
+model DrainEdge {
+  id          String    @id @default(uuid())
+  fromNodeId  String
+  fromNode    DrainNode @relation("FromNode", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  toNodeId    String
+  toNode      DrainNode @relation("ToNode", fields: [toNodeId], references: [id], onDelete: Cascade)
+  diameterM   Float
+  lengthM     Float
+  capacityM3s Float
+  roughnessN  Float     @default(0.013)
+}
+
+model FloodPredictionRecord {
+  id            String      @id @default(uuid())
+  segmentId     String
+  segment       RoadSegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  forecastMin   Int         // 0, 30, 60, 90, 120, 150, 180
+  depthCm       Float
+  probability   Float
+  riskLevel     String      // LOW, MODERATE, HIGH, CRITICAL, DARK_RED
+  surchargeLoad Float       // %
+  recommendation String
+  createdAt     DateTime    @default(now())
 }

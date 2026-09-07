@@ -43,8 +43,9 @@ export function Navbar() {
 
   const navLinks = [
     { href: '/', label: 'Home', icon: Waves },
-    { href: '/map', label: 'Interactive Map', icon: MapPin },
-    { href: '/how-it-works', label: 'How It Works', icon: Activity },
+    { href: '/map', label: 'GIS Command Center', icon: MapPin },
+    { href: '/sih-demo', label: 'SIH Architecture', icon: Activity },
+    { href: '/how-it-works', label: 'Pipeline', icon: BookOpen },
     { href: '/about', label: 'About', icon: Info },
     { href: '/safety', label: 'Safety & Emergency', icon: ShieldAlert },
     { href: '/contact', label: 'Contact', icon: PhoneCall },

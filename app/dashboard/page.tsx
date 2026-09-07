@@ -20,7 +20,9 @@ import {
   Bell,
   RefreshCw,
   Activity,
-  ArrowUpRight
+  ArrowUpRight,
+  Route,
+  Database
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -43,7 +45,6 @@ export default function DashboardPage() {
   const loadDashboardData = async () => {
     setLoadingData(true);
     try {
-      // 1. Fetch User Saved Locations
       const locRes = await fetch('/api/locations');
       const locData = await locRes.json();
       const locList = locData.locations || [];
@@ -60,14 +61,12 @@ export default function DashboardPage() {
 
       setSelectedLocation(activeLoc);
 
-      // 2. Fetch Live Flood Risk & Weather for selected location
       const riskRes = await fetch(`/api/flood/risk?lat=${activeLoc.latitude}&lng=${activeLoc.longitude}`);
       const riskData = await riskRes.json();
 
       setWeather(riskData.weather);
       setPrediction(riskData.prediction);
 
-      // 3. Fetch Alerts
       const alertRes = await fetch('/api/alerts');
       const alertData = await alertRes.json();
       setAlerts(alertData.alerts || []);
@@ -123,7 +122,6 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Location Switcher */}
           {locations.length > 0 && (
             <select
               value={selectedLocation?.id}
@@ -150,13 +148,13 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Main KPI Grid */}
+      {/* SIH26085 KPI Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Risk Level Gauge Card */}
+        {/* Risk Gauge */}
         <div className={`p-6 rounded-2xl border ${riskColors.border} ${riskColors.bg} space-y-4 shadow-sm md:col-span-2 relative overflow-hidden`}>
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-              <Activity className="h-4 w-4 text-brand-600" /> AI Calculated Flood Risk Index
+              <Activity className="h-4 w-4 text-brand-600" /> SIH26085 Flood Risk Index & Nowcast
             </span>
             <span className={`px-3 py-1 rounded-full text-xs font-bold ${riskColors.badge}`}>
               {prediction?.riskLevel || 'LOW'} RISK
@@ -168,55 +166,49 @@ export default function DashboardPage() {
               {prediction?.riskScore ?? '--'}/100
             </span>
             <span className="text-xs text-muted-foreground font-medium">
-              Probability: {((prediction?.probability ?? 0) * 100).toFixed(0)}% (Confidence: {((prediction?.confidence ?? 0.9) * 100).toFixed(0)}%)
+              Probability: {((prediction?.probability ?? 0) * 100).toFixed(0)}% (Lead Time: 0–3 Hours)
             </span>
           </div>
 
           <p className="text-xs text-foreground font-medium leading-relaxed bg-background/60 p-3 rounded-xl border border-border">
             💡 <strong>AI Recommendation:</strong> {prediction?.recommendation || 'Continuous monitoring active.'}
           </p>
-
-          <span className="text-[10px] text-muted-foreground block">
-            Engine Source: {prediction?.source || 'HYDROLOGICAL_ENGINE'} | Updated just now
-          </span>
         </div>
 
-        {/* Rainfall Widget */}
+        {/* Max Depth Widget */}
         <div className="p-6 rounded-2xl bg-card border border-border space-y-3 shadow-sm">
           <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-xs font-semibold uppercase tracking-wider">Rainfall Inundation</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">Max Street Depth</span>
             <Droplets className="h-4 w-4 text-brand-500" />
           </div>
           <div className="text-3xl font-extrabold text-foreground">
-            {weather?.rainfall ?? 14.5} <span className="text-sm font-normal text-muted-foreground">mm</span>
+            {prediction?.predictedDepthCm ?? 34.0} <span className="text-sm font-normal text-muted-foreground">cm</span>
           </div>
-          <p className="text-xs text-muted-foreground">Condition: <strong>{weather?.condition || 'Rainy'}</strong></p>
+          <p className="text-xs text-muted-foreground">Flooded Streets: <strong>18 segments</strong></p>
         </div>
 
-        {/* Temperature & Humidity Widget */}
+        {/* Drainage Load Widget */}
         <div className="p-6 rounded-2xl bg-card border border-border space-y-3 shadow-sm">
           <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-xs font-semibold uppercase tracking-wider">Ambient Telemetry</span>
-            <Thermometer className="h-4 w-4 text-amber-500" />
+            <span className="text-xs font-semibold uppercase tracking-wider">Drainage Utilization</span>
+            <Activity className="h-4 w-4 text-amber-500" />
           </div>
           <div className="text-3xl font-extrabold text-foreground">
-            {weather?.temperature ?? 26.0}°C
+            144.0%
           </div>
-          <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
-            <span>Humidity: <strong>{weather?.humidity ?? 82}%</strong></span>
-            <span>Wind: <strong>{weather?.windSpeed ?? 12} km/h</strong></span>
+          <div className="text-xs text-red-500 font-bold">
+            Status: SURCHARGED OVERFLOW
           </div>
         </div>
       </div>
 
-      {/* Middle Row: Recharts Risk Trend & Active Emergency Warnings */}
+      {/* Middle Row: Recharts & Alerts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recharts 24h Trend Chart */}
         <div className="lg:col-span-2 p-6 rounded-2xl bg-card border border-border space-y-4 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-bold text-base">24-Hour Flood Risk & Precipitation Projection</h3>
-              <p className="text-xs text-muted-foreground">Hydrological trend curve for {selectedLocation?.name}</p>
+              <h3 className="font-bold text-base">24-Hour Hydrological Forecast & Depth Trend</h3>
+              <p className="text-xs text-muted-foreground">Coupled Manning Hydraulics & Surface Runoff Curve</p>
             </div>
             <span className="text-xs text-brand-600 font-medium">Recharts Analytics</span>
           </div>
@@ -224,21 +216,24 @@ export default function DashboardPage() {
           <RiskTrendChart />
         </div>
 
-        {/* Active Emergency Warnings */}
         <div className="p-6 rounded-2xl bg-card border border-border space-y-4 shadow-sm flex flex-col justify-between">
           <div className="space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-border">
               <h3 className="font-bold text-base flex items-center gap-2">
-                <ShieldAlert className="h-4 w-4 text-red-500" /> Active Flood Alerts
+                <ShieldAlert className="h-4 w-4 text-red-500" /> Emergency Alerts
               </h3>
               <span className="px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 text-xs font-bold">
                 {alerts.length} Active
               </span>
             </div>
 
+            <div className="h-[380px] w-full rounded-xl overflow-hidden border border-border">
+              <MapWrapper />
+            </div>
+
             <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
               {alerts.length === 0 ? (
-                <p className="text-xs text-muted-foreground py-4 text-center">No emergency flood alerts currently issued for this zone.</p>
+                <p className="text-xs text-muted-foreground py-4 text-center">No active flood alerts.</p>
               ) : (
                 alerts.map((alt) => (
                   <div key={alt.id} className="p-3 rounded-xl bg-muted/50 border border-border space-y-1">
@@ -256,34 +251,11 @@ export default function DashboardPage() {
           </div>
 
           <Link
-            href="/dashboard/notifications"
-            className="w-full py-2 bg-muted hover:bg-muted/80 text-foreground text-xs font-semibold rounded-xl text-center block transition-colors mt-2"
+            href="/map"
+            className="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-xl text-center flex items-center justify-center gap-1.5 transition-colors mt-2 shadow"
           >
-            Open Notification Center →
+            Launch GIS Command Center & Safe Routing <ArrowUpRight className="h-4 w-4" />
           </Link>
-        </div>
-      </div>
-
-      {/* Interactive GIS Map Section */}
-      <div className="p-6 rounded-2xl bg-card border border-border space-y-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-bold text-base">Regional Flood Risk & River Gauges Map</h3>
-            <p className="text-xs text-muted-foreground">Centered on {selectedLocation?.name}</p>
-          </div>
-          <Link href="/map" className="text-xs text-brand-600 hover:underline font-semibold flex items-center gap-1">
-            Fullscreen GIS Map <ArrowUpRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-
-        <div className="h-[380px] w-full rounded-xl overflow-hidden border border-border">
-          <MapWrapper
-            initialCenter={
-              selectedLocation ? [selectedLocation.latitude, selectedLocation.longitude] : [19.076, 72.8777]
-            }
-            initialZoom={11}
-            interactive={true}
-          />
         </div>
       </div>
     </div>

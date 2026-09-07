@@ -10,7 +10,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma db push",
     "prisma:seed": "ts-node -O \"{\\\"module\\\":\\\"CommonJS\\\"}\" prisma/seed.ts",
-    "test": "ts-node -O \"{\\\"module\\\":\\\"CommonJS\\\"}\" tests/api.test.js"
+    "test": "ts-node -O \"{\\\"module\\\":\\\"CommonJS\\\"}\" tests/api.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.21.0",

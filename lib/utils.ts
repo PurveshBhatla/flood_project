@@ -5,6 +5,20 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export function getDepthColor(depthCm: number): { hex: string; bg: string; badge: string; text: string; label: string } {
+  if (depthCm >= 60.0) {
+    return { hex: '#7f1d1d', bg: 'bg-red-950/20', badge: 'bg-red-950 text-white', text: 'text-red-950 dark:text-red-400', label: 'DARK RED (60+ cm)' };
+  } else if (depthCm >= 30.0) {
+    return { hex: '#ef4444', bg: 'bg-red-500/10', badge: 'bg-red-500 text-white', text: 'text-red-500', label: 'RED (30-60 cm)' };
+  } else if (depthCm >= 15.0) {
+    return { hex: '#f97316', bg: 'bg-orange-500/10', badge: 'bg-orange-500 text-white', text: 'text-orange-500', label: 'ORANGE (15-30 cm)' };
+  } else if (depthCm >= 5.0) {
+    return { hex: '#f59e0b', bg: 'bg-amber-500/10', badge: 'bg-amber-500 text-white', text: 'text-amber-500', label: 'YELLOW (5-15 cm)' };
+  } else {
+    return { hex: '#10b981', bg: 'bg-emerald-500/10', badge: 'bg-emerald-500 text-white', text: 'text-emerald-500', label: 'GREEN (0-5 cm)' };
+  }
+}
+
 export function getRiskLevelColor(level: string): {
   bg: string;
   text: string;
@@ -13,6 +27,14 @@ export function getRiskLevelColor(level: string): {
   hex: string;
 } {
   switch (level.toUpperCase()) {
+    case 'DARK_RED':
+      return {
+        bg: 'bg-red-950/20',
+        text: 'text-red-950 dark:text-red-400',
+        border: 'border-red-900/50',
+        badge: 'bg-red-950 text-white',
+        hex: '#7f1d1d',
+      };
     case 'CRITICAL':
       return {
         bg: 'bg-red-500/10',

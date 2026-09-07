@@ -25,6 +25,8 @@ import {
   Database
 } from 'lucide-react';
 
+import RainfallGlobe from '@/components/3d/rainfall-globe';
+
 export default function DashboardPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
@@ -34,6 +36,7 @@ export default function DashboardPage() {
   const [weather, setWeather] = useState<any>(null);
   const [prediction, setPrediction] = useState<any>(null);
   const [alerts, setAlerts] = useState<any[]>([]);
+  const [rainfallData, setRainfallData] = useState<any>(null);
   const [loadingData, setLoadingData] = useState(true);
 
   useEffect(() => {
@@ -45,6 +48,13 @@ export default function DashboardPage() {
   const loadDashboardData = async () => {
     setLoadingData(true);
     try {
+      // Fetch Live Rainfall for 3D Globe Monitor
+      const rainRes = await fetch('/api/rainfall/current');
+      if (rainRes.ok) {
+        const rainJson = await rainRes.json();
+        setRainfallData(rainJson);
+      }
+
       const locRes = await fetch('/api/locations');
       const locData = await locRes.json();
       const locList = locData.locations || [];
@@ -147,6 +157,9 @@ export default function DashboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* 3D ROTATING EARTH WITH LIVE RAINFALL ZONES */}
+      <RainfallGlobe rainfallData={rainfallData} />
 
       {/* SIH26085 KPI Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

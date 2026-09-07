@@ -10,16 +10,9 @@ export async function GET(req: Request) {
     const lngStr = searchParams.get('lng');
     const radiusStr = searchParams.get('radius');
 
-    const lat = latStr ? parseFloat(latStr) : 19.076;
-    const lng = lngStr ? parseFloat(lngStr) : 72.8777;
+    const lat = latStr ? parseFloat(latStr) : undefined;
+    const lng = lngStr ? parseFloat(lngStr) : undefined;
     const radius = radiusStr ? parseFloat(radiusStr) : 15;
-
-    if (isNaN(lat) || isNaN(lng)) {
-      return NextResponse.json(
-        { error: 'Invalid latitude or longitude parameters' },
-        { status: 400 }
-      );
-    }
 
     const rainfallData = await RainfallService.getRainfall(lat, lng, radius);
     return NextResponse.json(rainfallData);

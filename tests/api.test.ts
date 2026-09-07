@@ -99,10 +99,11 @@ test('7. Street Flood Depth Color Code Scheme', () => {
   assert.equal(getDepthColor(70.0).label.includes('DARK RED'), true);
 });
 
-test('8. Centralized Rainfall Classification & Thresholds', () => {
+test('8. Centralized 4-Tier Rainfall Classification & Thresholds', () => {
   const { classifyRainfallIntensity, RAINFALL_THRESHOLDS } = require('../lib/utils');
   assert.equal(RAINFALL_THRESHOLDS.LOW_MAX, 10);
   assert.equal(RAINFALL_THRESHOLDS.MODERATE_MAX, 25);
+  assert.equal(RAINFALL_THRESHOLDS.HEAVY_MAX, 50);
 
   const low = classifyRainfallIntensity(5.0);
   assert.equal(low.category, 'LOW');
@@ -114,23 +115,45 @@ test('8. Centralized Rainfall Classification & Thresholds', () => {
   assert.equal(mod.color, 'YELLOW');
   assert.equal(mod.hex, '#f59e0b');
 
-  const extreme = classifyRainfallIntensity(35.0);
+  const heavy = classifyRainfallIntensity(35.0);
+  assert.equal(heavy.category, 'HEAVY');
+  assert.equal(heavy.color, 'ORANGE');
+  assert.equal(heavy.hex, '#f97316');
+
+  const extreme = classifyRainfallIntensity(65.0);
   assert.equal(extreme.category, 'EXTREME');
   assert.equal(extreme.color, 'RED');
   assert.equal(extreme.hex, '#ef4444');
 });
 
-test('9. Rainfall Service & Provider Architecture (Demo Fallback)', async () => {
-  const { RainfallService } = require('../lib/services/rainfall.service');
-  const result = await RainfallService.getRainfall(19.076, 72.8777);
+test('9. Dynamic India-Wide Rainfall Grid & Hotspot Ranking', async () => {
+  const { RainfallService, HeavyRainfallDetectionService } = require('../lib/services/rainfall.service');
+  const result = await RainfallService.getRainfall();
   assert.ok(['live', 'demo'].includes(result.mode));
-  assert.ok(result.areas.length > 0);
-  
-  const firstArea = result.areas[0];
-  assert.ok(typeof firstArea.lat === 'number');
-  assert.ok(typeof firstArea.lng === 'number');
-  assert.ok(typeof firstArea.rainfallMmPerHour === 'number');
-  assert.ok(['LOW', 'MODERATE', 'EXTREME'].includes(firstArea.category));
-  assert.ok(firstArea.timestamp);
+  assert.ok(result.cells.length >= 10);
+  assert.ok(Array.isArray(result.hotspots));
+
+  if (result.hotspots.length > 0) {
+    const topSpot = result.hotspots[0];
+    assert.ok(topSpot.rainfallMmPerHour >= 25.0);
+    assert.ok(['HEAVY', 'EXTREME'].includes(topSpot.severity));
+    assert.ok(topSpot.name);
+    assert.ok(topSpot.state);
+  }
 });
+
+test('10. HeavyRainfallDetectionService Filters & Sorts Hotspots', () => {
+  const { HeavyRainfallDetectionService } = require('../lib/services/rainfall.service');
+  const sampleCells = [
+    { id: '1', lat: 26.14, lng: 91.73, rainfallMmPerHour: 72.0, category: 'EXTREME', color: 'RED', region: 'Guwahati', state: 'Assam', locationName: 'Guwahati, Assam', timestamp: '2026-09-08' },
+    { id: '2', lat: 19.07, lng: 72.87, rainfallMmPerHour: 18.0, category: 'MODERATE', color: 'YELLOW', region: 'Mumbai', state: 'Maharashtra', locationName: 'Mumbai, Maharashtra', timestamp: '2026-09-08' },
+    { id: '3', lat: 20.29, lng: 85.82, rainfallMmPerHour: 43.0, category: 'HEAVY', color: 'ORANGE', region: 'Bhubaneswar', state: 'Odisha', locationName: 'Bhubaneswar, Odisha', timestamp: '2026-09-08' },
+  ];
+
+  const hotspots = HeavyRainfallDetectionService.detectHotspots(sampleCells, 25.0);
+  assert.equal(hotspots.length, 2);
+  assert.equal(hotspots[0].name, 'Guwahati'); // Highest first
+  assert.equal(hotspots[1].name, 'Bhubaneswar');
+});
+
 

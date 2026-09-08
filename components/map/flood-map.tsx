@@ -135,10 +135,22 @@ function MapEventsHandler({ onMapClick }: { onMapClick: (lat: number, lng: numbe
   return null;
 }
 
+import { useFloodSimulationContext } from '@/lib/context/flood-simulation-context';
+
 export default function FloodMap() {
+  const { isSimulatedAlert, demoData } = useFloodSimulationContext();
+
   // Default to India-wide view
   const [center, setCenter] = useState<[number, number]>([22.5937, 78.9629]);
   const [zoomLevel, setZoomLevel] = useState<number>(5);
+
+  useEffect(() => {
+    if (isSimulatedAlert) {
+      setCenter([19.076, 72.8777]);
+      setZoomLevel(15);
+    }
+  }, [isSimulatedAlert]);
+
   const [forecastMinutes, setForecastMinutes] = useState(90);
   const [geoJsonData, setGeoJsonData] = useState<any>(null);
   const [selectedStreet, setSelectedStreet] = useState<any>(null);
@@ -494,8 +506,24 @@ export default function FloodMap() {
 
   return (
     <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-2xl border border-border bg-background">
+      {/* ⚠️ IMMEDIATE FLASH BANNER FOR MAP OVERRIDE */}
+      {isSimulatedAlert && (
+        <div className="absolute top-1.5 left-4 right-4 z-[450] p-3 rounded-xl bg-red-600 text-white font-extrabold text-xs shadow-2xl border-2 border-red-400 flex items-center justify-between animate-pulse">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-yellow-300 shrink-0" />
+            <span>
+              ⚠️ SIH26085 EARLY WARNING: Critical runoff accumulation detected in low-lying sector. Drainage threshold breached. Evacuation route A-1 recommended.
+            </span>
+          </div>
+          <span className="px-2 py-0.5 rounded bg-black/40 text-[10px] uppercase font-black tracking-wider shrink-0 hidden sm:inline-block">
+            RED ALERT (+2H)
+          </span>
+        </div>
+      )}
+
       {/* Top Floating Header & Controls */}
-      <div className="absolute top-4 left-4 right-4 z-[400] flex flex-col md:flex-row gap-2 max-w-6xl">
+      <div className={`absolute ${isSimulatedAlert ? 'top-16' : 'top-4'} left-4 right-4 z-[400] flex flex-col md:flex-row gap-2 max-w-6xl transition-all`}>
+
         {/* Search Bar */}
         <form
           onSubmit={handleSearchSubmit}
@@ -1197,6 +1225,60 @@ export default function FloodMap() {
               </Popup>
             </Marker>
           ))}
+
+        {/* 🔴 RED ALERT SIMULATION MAP OVERLAYS & POPUP */}
+        {isSimulatedAlert && (
+          <React.Fragment>
+            {/* Primary Hotspot Red Circle Overlay (Flooded Depression Zone) */}
+            <Circle
+              center={[19.076, 72.8777]}
+              radius={450}
+              pathOptions={{
+                color: '#dc2626',
+                fillColor: '#ef4444',
+                fillOpacity: 0.65,
+                weight: 4,
+              }}
+            />
+            <Circle
+              center={[19.076, 72.8777]}
+              radius={850}
+              pathOptions={{
+                color: '#ef4444',
+                fillColor: '#ef4444',
+                fillOpacity: 0.2,
+                weight: 2,
+                dashArray: '8, 8',
+              }}
+            />
+
+            {/* Drain Node #D-14 Warning Marker & Popup */}
+            <Marker position={[19.076, 72.8777]} icon={customIcon('#dc2626')}>
+              <Popup autoPan={true}>
+                <div className="p-2.5 space-y-1.5 text-xs min-w-[250px]">
+                  <div className="flex items-center justify-between border-b border-red-500/40 pb-1">
+                    <span className="font-extrabold text-red-600 flex items-center gap-1 text-sm">
+                      🚨 CRITICAL OVERFLOW NODE
+                    </span>
+                    <span className="px-2 py-0.5 bg-red-600 text-white font-black text-[9px] rounded uppercase">
+                      142% OVERLOAD
+                    </span>
+                  </div>
+                  <p className="font-black text-sm text-foreground">
+                    Drain Node #D-14 Overflowing | Water Depth: 0.8m
+                  </p>
+                  <p className="text-[11px] text-muted-foreground font-semibold">
+                    Zone 4 - Central Market / Railway Underpass
+                  </p>
+                  <div className="p-2 rounded-xl bg-red-500/10 border border-red-500/40 text-[11px] text-red-600 font-bold leading-snug">
+                    ⚠️ 78.4 mm/hr Cloudburst Warning. Inundation depth predicted 0.65m–0.90m in 45-75 mins. Use Evacuation Route A-1.
+                  </div>
+                </div>
+              </Popup>
+            </Marker>
+          </React.Fragment>
+        )}
+
       </MapContainer>
     </div>
   );

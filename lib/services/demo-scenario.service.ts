@@ -1,5 +1,6 @@
 export interface DemoScenarioData {
   isDemoActive: boolean;
+  isSimulatedAlert: boolean;
   scenarioName: string;
   selectedLocation: {
     id: string;
@@ -12,17 +13,21 @@ export interface DemoScenarioData {
   };
   prediction: {
     riskScore: number;
-    riskLevel: 'CRITICAL';
+    riskLevel: 'CRITICAL RED ALERT';
+    riskScoreBadgeText: string;
     probability: number;
     predictedDepthCm: number;
+    predictedDepthRangeText: string;
     recommendation: string;
     floodedStreetsCount: number;
     nowcastBannerText: string;
+    drainNodePopupText: string;
   };
   telemetry: {
     drainageUtilization: number;
     drainageStatus: string;
     rainfallMmHr: number;
+    rainfallIntensityText: string;
     soilSaturationPercent: number;
     waterSensorLevelMeter: number;
     temperature: number;
@@ -36,6 +41,7 @@ export class DemoScenarioService {
   static getHighFloodScenario(): DemoScenarioData {
     return {
       isDemoActive: true,
+      isSimulatedAlert: true,
       scenarioName: 'High Flood Risk (Nowcast +2h)',
       selectedLocation: {
         id: 'zone-4-demo',
@@ -47,80 +53,85 @@ export class DemoScenarioService {
         ward: 'Ward 4-B Central Market',
       },
       prediction: {
-        riskScore: 88,
-        riskLevel: 'CRITICAL',
-        probability: 0.94,
-        predictedDepthCm: 65,
+        riskScore: 94,
+        riskLevel: 'CRITICAL RED ALERT',
+        riskScoreBadgeText: '94 / 100 — CRITICAL RED ALERT',
+        probability: 0.96,
+        predictedDepthCm: 75,
+        predictedDepthRangeText: '0.65m - 0.90m Depth Predicted in 45-75 mins',
         recommendation:
-          'Avoid Underpass. Evacuation Route A-2 Active. Contact Local Ward Control Room.',
-        floodedStreetsCount: 34,
+          'Avoid Underpass. Evacuation Route A-1 Recommended. Contact Local Ward Control Room.',
+        floodedStreetsCount: 38,
         nowcastBannerText:
-          '⚠️ CRITICAL NOWCAST (+2h): Inundation expected in 45-90 mins due to 68mm/hr localized cloudburst exceeding drainage throughput by 135%.',
+          '⚠️ SIH26085 EARLY WARNING: Critical runoff accumulation detected in low-lying sector. Drainage threshold breached. Evacuation route A-1 recommended.',
+        drainNodePopupText: 'Drain Node #D-14 Overflowing | Water Depth: 0.8m',
       },
       telemetry: {
-        drainageUtilization: 135,
-        drainageStatus: 'SURCHARGED OVERFLOW',
-        rainfallMmHr: 68.0,
-        soilSaturationPercent: 94,
-        waterSensorLevelMeter: 1.2,
+        drainageUtilization: 142,
+        drainageStatus: '142% Overcapacity (Drain Blockage / Surcharge)',
+        rainfallMmHr: 78.4,
+        rainfallIntensityText: '78.4 mm/hr (Cloudburst Warning)',
+        soilSaturationPercent: 96,
+        waterSensorLevelMeter: 1.4,
         temperature: 26.5,
-        humidity: 92,
-        windSpeed: 24.5,
+        humidity: 94,
+        windSpeed: 28.5,
       },
       forecast: {
         mode: 'demo',
         updatedAt: new Date().toISOString(),
-        currentMmHr: 68.0,
-        next1hMmHr: 45.0,
-        next3hPeakMmHr: 68.0,
-        next6hPeakMmHr: 72.0,
+        currentMmHr: 78.4,
+        next1hMmHr: 58.0,
+        next3hPeakMmHr: 78.4,
+        next6hPeakMmHr: 82.0,
         next1hClassification: {
           category: 'EXTREME',
           color: 'RED',
           hex: '#ef4444',
-          label: 'Very Heavy / Extreme',
-          badgeClass: 'bg-red-500 text-white',
-          bgClass: 'bg-red-500/10',
+          label: 'Very Heavy / Extreme Cloudburst',
+          badgeClass: 'bg-red-600 text-white font-extrabold',
+          bgClass: 'bg-red-600/20',
           textClass: 'text-red-500',
-          rangeLabel: '50+ mm/hr',
+          rangeLabel: '70+ mm/hr',
         },
         next3hClassification: {
           category: 'EXTREME',
           color: 'RED',
           hex: '#ef4444',
-          label: 'Very Heavy / Extreme',
-          badgeClass: 'bg-red-500 text-white',
-          bgClass: 'bg-red-500/10',
+          label: 'Very Heavy / Extreme Cloudburst',
+          badgeClass: 'bg-red-600 text-white font-extrabold',
+          bgClass: 'bg-red-600/20',
           textClass: 'text-red-500',
-          rangeLabel: '50+ mm/hr',
+          rangeLabel: '70+ mm/hr',
         },
         next6hClassification: {
           category: 'EXTREME',
           color: 'RED',
           hex: '#ef4444',
-          label: 'Very Heavy / Extreme',
-          badgeClass: 'bg-red-500 text-white',
-          bgClass: 'bg-red-500/10',
+          label: 'Very Heavy / Extreme Cloudburst',
+          badgeClass: 'bg-red-600 text-white font-extrabold',
+          bgClass: 'bg-red-600/20',
           textClass: 'text-red-500',
-          rangeLabel: '50+ mm/hr',
+          rangeLabel: '70+ mm/hr',
         },
         warningLevel: 'VERY_HEAVY',
-        warningTitle: '🔴 CRITICAL FLOOD NOWCAST (+2h): Severe Cloudburst Inundation',
+        warningTitle: '🔴 CRITICAL FLOOD NOWCAST (+2h): Cloudburst Overcapacity Warning',
         warningIcon: '🔴',
-        warningColorClass: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/40 ring-1 ring-red-500/30',
+        warningColorClass: 'bg-red-600/20 text-red-600 dark:text-red-400 border-red-600/60 ring-2 ring-red-500/40',
         expectedInHours: 2,
-        expectedTimeText: 'Expected in 45–90 mins',
-        precipitationProbability: 94,
+        expectedTimeText: 'Expected in 45–75 mins',
+        precipitationProbability: 96,
         hourly: [
-          { hourOffset: 0, timeLabel: 'NOW', precipitationMmHr: 68.0, probabilityPercent: 94, category: 'EXTREME', label: 'Very Heavy / Extreme', badgeClass: 'bg-red-500 text-white', bgClass: 'bg-red-500/10', textClass: 'text-red-500', hex: '#ef4444' },
-          { hourOffset: 1, timeLabel: '1H', precipitationMmHr: 52.0, probabilityPercent: 90, category: 'EXTREME', label: 'Very Heavy / Extreme', badgeClass: 'bg-red-500 text-white', bgClass: 'bg-red-500/10', textClass: 'text-red-500', hex: '#ef4444' },
-          { hourOffset: 2, timeLabel: '2H', precipitationMmHr: 68.0, probabilityPercent: 94, category: 'EXTREME', label: 'Very Heavy / Extreme', badgeClass: 'bg-red-500 text-white', bgClass: 'bg-red-500/10', textClass: 'text-red-500', hex: '#ef4444' },
-          { hourOffset: 3, timeLabel: '3H', precipitationMmHr: 42.0, probabilityPercent: 80, category: 'HEAVY', label: 'Heavy', badgeClass: 'bg-orange-500 text-white', bgClass: 'bg-orange-500/10', textClass: 'text-orange-500', hex: '#f97316' },
-          { hourOffset: 4, timeLabel: '4H', precipitationMmHr: 28.0, probabilityPercent: 65, category: 'HEAVY', label: 'Heavy', badgeClass: 'bg-orange-500 text-white', bgClass: 'bg-orange-500/10', textClass: 'text-orange-500', hex: '#f97316' },
-          { hourOffset: 5, timeLabel: '5H', precipitationMmHr: 14.0, probabilityPercent: 45, category: 'MODERATE', label: 'Moderate', badgeClass: 'bg-amber-500 text-white', bgClass: 'bg-amber-500/10', textClass: 'text-amber-500', hex: '#f59e0b' },
-          { hourOffset: 6, timeLabel: '6H', precipitationMmHr: 6.0, probabilityPercent: 30, category: 'LOW', label: 'Low', badgeClass: 'bg-emerald-500 text-white', bgClass: 'bg-emerald-500/10', textClass: 'text-emerald-500', hex: '#10b981' },
+          { hourOffset: 0, timeLabel: 'NOW', precipitationMmHr: 78.4, probabilityPercent: 96, category: 'EXTREME', label: 'Extreme Cloudburst', badgeClass: 'bg-red-600 text-white', bgClass: 'bg-red-600/20', textClass: 'text-red-500', hex: '#ef4444' },
+          { hourOffset: 1, timeLabel: '1H', precipitationMmHr: 62.0, probabilityPercent: 92, category: 'EXTREME', label: 'Extreme Cloudburst', badgeClass: 'bg-red-600 text-white', bgClass: 'bg-red-600/20', textClass: 'text-red-500', hex: '#ef4444' },
+          { hourOffset: 2, timeLabel: '2H', precipitationMmHr: 78.4, probabilityPercent: 96, category: 'EXTREME', label: 'Extreme Cloudburst', badgeClass: 'bg-red-600 text-white', bgClass: 'bg-red-600/20', textClass: 'text-red-500', hex: '#ef4444' },
+          { hourOffset: 3, timeLabel: '3H', precipitationMmHr: 48.0, probabilityPercent: 82, category: 'HEAVY', label: 'Heavy Rain', badgeClass: 'bg-orange-500 text-white', bgClass: 'bg-orange-500/10', textClass: 'text-orange-500', hex: '#f97316' },
+          { hourOffset: 4, timeLabel: '4H', precipitationMmHr: 32.0, probabilityPercent: 70, category: 'HEAVY', label: 'Heavy Rain', badgeClass: 'bg-orange-500 text-white', bgClass: 'bg-orange-500/10', textClass: 'text-orange-500', hex: '#f97316' },
+          { hourOffset: 5, timeLabel: '5H', precipitationMmHr: 16.0, probabilityPercent: 50, category: 'MODERATE', label: 'Moderate', badgeClass: 'bg-amber-500 text-white', bgClass: 'bg-amber-500/10', textClass: 'text-amber-500', hex: '#f59e0b' },
+          { hourOffset: 6, timeLabel: '6H', precipitationMmHr: 8.0, probabilityPercent: 35, category: 'LOW', label: 'Low', badgeClass: 'bg-emerald-500 text-white', bgClass: 'bg-emerald-500/10', textClass: 'text-emerald-500', hex: '#10b981' },
         ],
       },
     };
   }
 }
+

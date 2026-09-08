@@ -233,13 +233,16 @@ test('15. DemoScenarioService High Flood Risk (+2h Nowcast) Simulation', () => {
 
   const demo = DemoScenarioService.getHighFloodScenario();
   assert.equal(demo.isDemoActive, true);
-  assert.equal(demo.prediction.riskLevel, 'CRITICAL');
-  assert.equal(demo.prediction.riskScore, 88);
-  assert.equal(demo.telemetry.drainageUtilization, 135);
-  assert.equal(demo.telemetry.rainfallMmHr, 68.0);
-  assert.equal(demo.telemetry.soilSaturationPercent, 94);
-  assert.ok(demo.prediction.nowcastBannerText.includes('CRITICAL NOWCAST'));
+  assert.equal(demo.isSimulatedAlert, true);
+  assert.equal(demo.prediction.riskLevel, 'CRITICAL RED ALERT');
+  assert.equal(demo.prediction.riskScore, 94);
+  assert.equal(demo.telemetry.drainageUtilization, 142);
+  assert.equal(demo.telemetry.rainfallMmHr, 78.4);
+  assert.equal(demo.telemetry.soilSaturationPercent, 96);
+  assert.ok(demo.prediction.nowcastBannerText.includes('SIH26085 EARLY WARNING'));
+  assert.ok(demo.prediction.drainNodePopupText.includes('Drain Node #D-14 Overflowing'));
 });
+
 
 
 

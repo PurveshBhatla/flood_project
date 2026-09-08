@@ -311,16 +311,16 @@ export default function DashboardPage() {
             <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
               <Activity className="h-4 w-4 text-brand-600" /> SIH26085 Flood Risk Index & Nowcast
             </span>
-            <span className={`px-3 py-1 rounded-full text-xs font-bold ${activeRiskColors.badge}`}>
-              {activePrediction?.riskLevel || 'LOW'} RISK
+            <span className={`px-3 py-1 rounded-full text-xs font-black ${activeRiskColors.badge}`}>
+              {isDemoActive ? '94 / 100 — CRITICAL RED ALERT' : `${activePrediction?.riskLevel || 'LOW'} RISK`}
             </span>
           </div>
 
-          <div className="flex items-baseline gap-3">
-            <span className={`text-5xl font-extrabold ${activeRiskColors.text}`}>
-              {activePrediction?.riskScore ?? '--'}/100
+          <div className="flex items-baseline gap-3 flex-wrap">
+            <span className={`text-3xl md:text-5xl font-black ${activeRiskColors.text}`}>
+              {isDemoActive ? '94 / 100 — CRITICAL RED ALERT' : `${activePrediction?.riskScore ?? '--'}/100`}
             </span>
-            <span className="text-xs text-muted-foreground font-medium">
+            <span className="text-xs text-muted-foreground font-medium block">
               Probability: {((activePrediction?.probability ?? 0) * 100).toFixed(0)}% (Lead Time: 0–3 Hours)
             </span>
           </div>
@@ -331,40 +331,42 @@ export default function DashboardPage() {
         </div>
 
         {/* Max Depth Widget */}
-        <div className="p-6 rounded-2xl bg-card border border-border space-y-3 shadow-sm">
+        <div className={`p-6 rounded-2xl border space-y-3 shadow-sm ${isDemoActive ? 'bg-red-500/10 border-red-500/40 ring-2 ring-red-500/30' : 'bg-card border-border'}`}>
           <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-xs font-semibold uppercase tracking-wider">Max Street Depth</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">Estimated Inundation</span>
             <Droplets className="h-4 w-4 text-brand-500" />
           </div>
-          <div className="text-3xl font-extrabold text-foreground">
-            {activePrediction?.predictedDepthCm ?? 34.0} <span className="text-sm font-normal text-muted-foreground">cm</span>
+          <div className="text-2xl font-extrabold text-foreground">
+            {isDemoActive ? '0.65m - 0.90m' : `${activePrediction?.predictedDepthCm ?? 34.0} cm`}
           </div>
-          <p className="text-xs text-muted-foreground">
-            Est. Water Depth: <strong>0.45m – 0.75m</strong> ({activePrediction?.floodedStreetsCount || 18} segments)
+          <p className="text-xs text-muted-foreground font-semibold">
+            {isDemoActive
+              ? '0.65m - 0.90m Depth Predicted in 45-75 mins'
+              : `Est. Water Depth: 0.45m – 0.75m (${activePrediction?.floodedStreetsCount || 18} segments)`}
           </p>
         </div>
 
         {/* Drainage Load Widget */}
-        <div className="p-6 rounded-2xl bg-card border border-border space-y-3 shadow-sm">
+        <div className={`p-6 rounded-2xl border space-y-3 shadow-sm ${isDemoActive ? 'bg-red-500/10 border-red-500/40 ring-2 ring-red-500/30' : 'bg-card border-border'}`}>
           <div className="flex items-center justify-between text-muted-foreground">
             <span className="text-xs font-semibold uppercase tracking-wider">Drainage Utilization</span>
             <Activity className="h-4 w-4 text-amber-500" />
           </div>
           <div className="text-3xl font-extrabold text-foreground">
-            {activeTelemetry.drainageUtilization.toFixed(1)}%
+            {isDemoActive ? '142%' : `${activeTelemetry.drainageUtilization.toFixed(1)}%`}
           </div>
-          <div className="text-xs text-red-500 font-bold">
-            Status: {activeTelemetry.drainageStatus}
+          <div className="text-xs text-red-500 font-extrabold">
+            Status: {isDemoActive ? '142% Overcapacity (Drain Blockage / Surcharge)' : activeTelemetry.drainageStatus}
           </div>
         </div>
       </div>
 
       {/* ADDITIONAL TELEMETRY METRICS GRID (SOIL MOISTURE, SENSOR LEVEL, CLOUDBURST) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-        <div className="p-4 rounded-xl bg-card border border-border space-y-1 shadow-sm">
-          <span className="text-muted-foreground font-semibold block text-[11px] uppercase">Rainfall Rate</span>
-          <strong className="text-lg font-extrabold text-brand-600 dark:text-brand-400 block">
-            {activeTelemetry.rainfallMmHr} mm/hr
+        <div className={`p-4 rounded-xl border space-y-1 shadow-sm ${isDemoActive ? 'bg-red-500/10 border-red-500/40' : 'bg-card border-border'}`}>
+          <span className="text-muted-foreground font-semibold block text-[11px] uppercase">Rainfall Intensity</span>
+          <strong className="text-base font-extrabold text-red-600 dark:text-red-400 block">
+            {isDemoActive ? '78.4 mm/hr (Cloudburst Warning)' : `${activeTelemetry.rainfallMmHr} mm/hr`}
           </strong>
           <span className="text-[10px] text-muted-foreground">Open-Meteo Telemetry</span>
         </div>

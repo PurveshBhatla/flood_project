@@ -215,6 +215,20 @@ test('13. WeatherService Rainfall Forecast & Early Rain Alert Pipeline', async (
   assert.ok(['live', 'demo'].includes(weather.forecast.mode));
 });
 
+test('14. EmergencyKnowledgeService Protocols & Query Engine', () => {
+  const { EmergencyKnowledgeService } = require('../lib/services/emergency-knowledge.service');
+
+  const res1 = EmergencyKnowledgeService.queryEmergencyAI('Water is entering my house', 'Mumbai');
+  assert.ok(res1.actionableSteps.length > 0);
+  assert.ok(res1.warnings.length > 0);
+  assert.equal(res1.emergencyContacts[0].number, '112');
+
+  const res2 = EmergencyKnowledgeService.queryEmergencyAI('My car is stuck in flood water');
+  assert.equal(res2.category, 'VEHICLE');
+  assert.ok(res2.actionableSteps.some((s: string) => s.toLowerCase().includes('vehicle') || s.toLowerCase().includes('car')));
+});
+
+
 
 
 

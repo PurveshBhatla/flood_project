@@ -44,10 +44,10 @@ export function Navbar() {
   const navLinks = [
     { href: '/', label: 'Home', icon: Waves },
     { href: '/map', label: 'GIS Command Center', icon: MapPin },
+    { href: '/emergency', label: 'Emergency AI & SOS', icon: ShieldAlert },
     { href: '/sih-demo', label: 'SIH Architecture', icon: Activity },
     { href: '/how-it-works', label: 'Pipeline', icon: BookOpen },
     { href: '/about', label: 'About', icon: Info },
-    { href: '/safety', label: 'Safety & Emergency', icon: ShieldAlert },
     { href: '/contact', label: 'Contact', icon: PhoneCall },
   ];
 

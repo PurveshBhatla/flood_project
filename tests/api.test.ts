@@ -228,6 +228,20 @@ test('14. EmergencyKnowledgeService Protocols & Query Engine', () => {
   assert.ok(res2.actionableSteps.some((s: string) => s.toLowerCase().includes('vehicle') || s.toLowerCase().includes('car')));
 });
 
+test('15. DemoScenarioService High Flood Risk (+2h Nowcast) Simulation', () => {
+  const { DemoScenarioService } = require('../lib/services/demo-scenario.service');
+
+  const demo = DemoScenarioService.getHighFloodScenario();
+  assert.equal(demo.isDemoActive, true);
+  assert.equal(demo.prediction.riskLevel, 'CRITICAL');
+  assert.equal(demo.prediction.riskScore, 88);
+  assert.equal(demo.telemetry.drainageUtilization, 135);
+  assert.equal(demo.telemetry.rainfallMmHr, 68.0);
+  assert.equal(demo.telemetry.soilSaturationPercent, 94);
+  assert.ok(demo.prediction.nowcastBannerText.includes('CRITICAL NOWCAST'));
+});
+
+
 
 
 

@@ -8,6 +8,7 @@ import MapWrapper from '@/components/map/map-wrapper';
 import { RiskTrendChart } from '@/components/charts/risk-trend-chart';
 import { getRiskLevelColor } from '@/lib/utils';
 import { useFloodSimulation } from '@/lib/hooks/use-flood-simulation';
+import { useCitizenReports } from '@/lib/context/citizen-report-context';
 import {
   Waves,
   MapPin,
@@ -28,7 +29,8 @@ import {
   Radio,
   RotateCcw,
   Zap,
-  Sliders
+  Sliders,
+  Megaphone
 } from 'lucide-react';
 
 import RainfallGlobe from '@/components/3d/rainfall-globe';
@@ -39,6 +41,8 @@ export default function DashboardPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { isDemoActive, demoData, toggleDemoMode, resetToLive } = useFloodSimulation();
+  const { openReportModal } = useCitizenReports();
+
 
   const [locations, setLocations] = useState<any[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
@@ -290,6 +294,13 @@ export default function DashboardPage() {
               WARD DEMO LOCK ACTIVE
             </span>
           )}
+
+          <button
+            onClick={openReportModal}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs transition-all shadow-md cursor-pointer animate-pulse"
+          >
+            <Megaphone className="h-4 w-4 text-slate-950" /> 📢 Report Flood (Citizen Desk)
+          </button>
 
           <Link
             href="/dashboard/locations"

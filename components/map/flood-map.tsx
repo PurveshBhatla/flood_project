@@ -187,6 +187,30 @@ const safeRouteCoords: [number, number][] = [
 ];
 
 
+const citizenReportIcon = () =>
+  L.divIcon({
+    className: 'custom-citizen-pin',
+    html: `
+      <div style="
+        background-color: #f59e0b;
+        color: white;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        border: 3px solid white;
+        box-shadow: 0 0 16px rgba(245, 158, 11, 0.8), 0 4px 12px rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+      ">
+        📢
+      </div>
+    `,
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+  });
+
 function MapRecenter({ center, zoom = 6 }: { center: [number, number]; zoom?: number }) {
   const map = useMap();
   useEffect(() => {
@@ -205,13 +229,16 @@ function MapEventsHandler({ onMapClick }: { onMapClick: (lat: number, lng: numbe
 }
 
 import { useFloodSimulationContext } from '@/lib/context/flood-simulation-context';
+import { useCitizenReports } from '@/lib/context/citizen-report-context';
 
 export default function FloodMap() {
   const { isSimulatedAlert, demoData } = useFloodSimulationContext();
+  const { reports: citizenReports, openReportModal } = useCitizenReports();
 
   // Default to India-wide view
   const [center, setCenter] = useState<[number, number]>([22.5937, 78.9629]);
   const [zoomLevel, setZoomLevel] = useState<number>(5);
+
 
   useEffect(() => {
     if (isSimulatedAlert) {
@@ -615,6 +642,15 @@ export default function FloodMap() {
           </button>
         </form>
 
+        {/* 📢 Prominent "Report Flood / Jal-Bharo (Citizen Desk)" Map Control Button */}
+        <button
+          onClick={openReportModal}
+          className="flex items-center gap-2 px-3.5 py-2 text-xs font-black rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 border border-amber-300 shadow-xl transition-all shrink-0 animate-pulse cursor-pointer"
+        >
+          <span className="text-base">📢</span>
+          <span>Report Flood / Jal-Bharo (Citizen Desk)</span>
+        </button>
+
         {/* 🏠 Prominent "Nearest Safe Shelters" Map Control Button */}
         <button
           onClick={() => {
@@ -638,6 +674,7 @@ export default function FloodMap() {
           <span className="text-base">🏠</span>
           <span>Nearest Safe Shelters</span>
         </button>
+
 
         {/* Use My Location Button */}
         <button
@@ -1400,6 +1437,71 @@ export default function FloodMap() {
             </Marker>
           </React.Fragment>
         )}
+
+        {/* 📢 CITIZEN VERIFIED INCIDENT MARKERS ON MAP */}
+        {citizenReports.map((report) => (
+          <Marker
+            key={`cit-marker-${report.id}`}
+            position={[report.latitude, report.longitude]}
+            icon={citizenReportIcon()}
+          >
+            <Popup autoPan={true}>
+              <div className="p-2.5 space-y-2 text-xs min-w-[240px] max-w-[280px]">
+                <div className="flex items-center justify-between border-b border-amber-500/40 pb-1">
+                  <span className="font-extrabold text-amber-600 dark:text-amber-400 flex items-center gap-1.5 text-xs">
+                    📢 Citizen Verified Incident
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-amber-500 text-slate-950 font-black text-[9px] uppercase">
+                    GROUND-TRUTH
+                  </span>
+                </div>
+
+                {/* Uploaded Image Preview if present */}
+                {report.imageUrl && (
+                  <div className="rounded-xl overflow-hidden border border-border shadow-sm">
+                    <img
+                      src={report.imageUrl}
+                      alt="Citizen Flood Report"
+                      className="w-full h-32 object-cover"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-1 text-[11px]">
+                  <h4 className="font-extrabold text-foreground text-xs leading-snug">
+                    {report.streetName}
+                  </h4>
+                  <div className="flex items-center justify-between pt-0.5">
+                    <span className="text-muted-foreground">Water Depth:</span>
+                    <strong className="text-red-600 dark:text-red-400 font-extrabold text-xs">
+                      {report.waterDepth} ({report.waterDepthCategory})
+                    </strong>
+                  </div>
+
+                  <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[10px] text-amber-600 font-bold">
+                    {report.aiEstimate}
+                  </div>
+
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {report.tags.map((t, idx) => (
+                      <span
+                        key={idx}
+                        className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground text-[9px] font-bold"
+                      >
+                        #{t}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1.5 border-t border-border/40">
+                    <span>{report.timestamp}</span>
+                    <strong className="text-emerald-600 font-extrabold">{report.status}</strong>
+                  </div>
+                </div>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
       </MapContainer>
 
       {/* 🔀 AI DYNAMIC FLOOD REROUTE NAVIGATION CARD (FLOATING PANEL OVERLAY) */}

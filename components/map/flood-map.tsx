@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
+
 import {
   MapContainer,
   TileLayer,
@@ -45,6 +46,10 @@ import {
   ShieldCheck,
   AlertCircle
 } from 'lucide-react';
+
+import { useFloodSimulationContext } from '@/lib/context/flood-simulation-context';
+import { useCitizenReports } from '@/lib/context/citizen-report-context';
+
 
 // Custom Map Pins
 const customIcon = (color: string) =>
@@ -228,16 +233,25 @@ function MapEventsHandler({ onMapClick }: { onMapClick: (lat: number, lng: numbe
   return null;
 }
 
-import { useFloodSimulationContext } from '@/lib/context/flood-simulation-context';
-import { useCitizenReports } from '@/lib/context/citizen-report-context';
-
 export default function FloodMap() {
+
+
   const { isSimulatedAlert, demoData } = useFloodSimulationContext();
   const { reports: citizenReports, openReportModal } = useCitizenReports();
+
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (searchContainerRef.current && typeof window !== 'undefined') {
+      L.DomEvent.disableClickPropagation(searchContainerRef.current);
+      L.DomEvent.disableScrollPropagation(searchContainerRef.current);
+    }
+  }, []);
 
   // Default to India-wide view
   const [center, setCenter] = useState<[number, number]>([22.5937, 78.9629]);
   const [zoomLevel, setZoomLevel] = useState<number>(5);
+
 
 
   useEffect(() => {
@@ -618,29 +632,46 @@ export default function FloodMap() {
       )}
 
       {/* Top Floating Header & Controls */}
-      <div className={`absolute ${isSimulatedAlert ? 'top-16' : 'top-4'} left-4 right-4 z-[400] flex flex-col md:flex-row gap-2 max-w-6xl transition-all`}>
-
+      <div
+        ref={searchContainerRef}
+        className={`absolute ${isSimulatedAlert ? 'top-16' : 'top-4'} left-4 right-4 z-[2000] pointer-events-auto flex flex-col md:flex-row gap-2 max-w-6xl transition-all`}
+      >
         {/* Search Bar */}
         <form
           onSubmit={handleSearchSubmit}
-          className="flex-1 flex items-center bg-background/95 backdrop-blur-md border border-border shadow-lg rounded-xl px-3 py-1.5"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          className="flex-1 flex items-center bg-background/95 backdrop-blur-md border border-border shadow-xl rounded-xl px-3 py-1.5 z-[2001] pointer-events-auto cursor-text focus-within:ring-2 focus-within:ring-brand-500"
         >
-          <Search className="h-4 w-4 text-muted-foreground mr-2 shrink-0" />
+          <Search className="h-4 w-4 text-muted-foreground mr-2 shrink-0 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onMouseDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === 'Enter') {
+                handleSearchSubmit(e);
+              }
+            }}
             placeholder="Search Indian city, district, or address (e.g. Guwahati, Wayanad, Mumbai, Odisha)..."
-            className="bg-transparent border-none outline-none text-xs w-full text-foreground placeholder:text-muted-foreground"
+            className="bg-transparent border-none outline-none text-xs w-full text-foreground placeholder:text-muted-foreground pointer-events-auto cursor-text"
           />
           <button
             type="submit"
             disabled={loadingSearch}
-            className="px-3 py-1 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold transition-colors ml-2 shrink-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleSearchSubmit(e);
+            }}
+            className="px-3.5 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-bold transition-all ml-2 shrink-0 cursor-pointer pointer-events-auto shadow-md"
           >
             {loadingSearch ? 'Locating...' : 'Search'}
           </button>
         </form>
+
 
         {/* 📢 Prominent "Report Flood / Jal-Bharo (Citizen Desk)" Map Control Button */}
         <button

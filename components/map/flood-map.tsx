@@ -233,6 +233,41 @@ function MapEventsHandler({ onMapClick }: { onMapClick: (lat: number, lng: numbe
   return null;
 }
 
+// Preset Demo Geocoding Locations for instant offline search & map flying
+const DEMO_LOCATIONS: Record<string, [number, number]> = {
+  delhi: [28.6139, 77.2090],
+  'new delhi': [28.6139, 77.2090],
+  mumbai: [19.0760, 72.8777],
+  bombay: [19.0760, 72.8777],
+  bengaluru: [12.9716, 77.5946],
+  bangalore: [12.9716, 77.5946],
+  chennai: [13.0827, 80.2707],
+  madras: [13.0827, 80.2707],
+  guwahati: [26.1445, 91.7362],
+  assam: [26.1445, 91.7362],
+  wayanad: [11.6854, 76.1320],
+  kerala: [10.8505, 76.2711],
+  odisha: [20.9517, 85.0985],
+  bhubaneswar: [20.2961, 85.8245],
+  cuttack: [20.4625, 85.8828],
+  underpass: [19.0760, 72.8777],
+  'underpass hotspot': [19.0760, 72.8777],
+  'flooded underpass': [19.0760, 72.8777],
+  kurla: [19.0657, 72.8784],
+  chembur: [19.0623, 72.8974],
+  dharavi: [19.0402, 72.8508],
+  kolkata: [22.5726, 88.3639],
+  hyderabad: [17.3850, 78.4867],
+  pune: [18.5204, 73.8567],
+  ahmedabad: [23.0225, 72.5714],
+  jaipur: [26.9124, 75.7873],
+  lucknow: [26.8467, 80.9462],
+  patna: [25.5941, 85.1376],
+  surat: [21.1702, 72.8311],
+  kochi: [9.9312, 76.2673],
+  thiruvananthapuram: [8.5241, 76.9366],
+};
+
 export default function FloodMap() {
 
 
@@ -240,6 +275,7 @@ export default function FloodMap() {
   const { reports: citizenReports, openReportModal } = useCitizenReports();
 
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (searchContainerRef.current && typeof window !== 'undefined') {
@@ -251,6 +287,14 @@ export default function FloodMap() {
   // Default to India-wide view
   const [center, setCenter] = useState<[number, number]>([22.5937, 78.9629]);
   const [zoomLevel, setZoomLevel] = useState<number>(5);
+
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+
+  useEffect(() => {
+    if (isSearchExpanded && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [isSearchExpanded]);
 
 
 
@@ -576,12 +620,29 @@ export default function FloodMap() {
     return () => clearInterval(timer);
   }, [isSimulating]);
 
-  const handleSearchSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
+  const handleSearchSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return;
 
     setLoadingSearch(true);
     try {
+      // 1. Check local preset DEMO_LOCATIONS dictionary first for instant response
+      const matchedKey = Object.keys(DEMO_LOCATIONS).find(
+        (key) => query.includes(key) || key.includes(query)
+      );
+
+      if (matchedKey) {
+        const [lat, lng] = DEMO_LOCATIONS[matchedKey];
+        setCenter([lat, lng]);
+        setZoomLevel(13);
+        setSelectedMapPoint([lat, lng]);
+        setUserLocation(null);
+        setLoadingSearch(false);
+        return;
+      }
+
+      // 2. Fallback to OpenStreetMap Nominatim API for arbitrary queries
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery + ', India')}`
       );
@@ -590,12 +651,12 @@ export default function FloodMap() {
         const lat = parseFloat(data[0].lat);
         const lng = parseFloat(data[0].lon);
         setCenter([lat, lng]);
-        setZoomLevel(11);
+        setZoomLevel(13);
         setSelectedMapPoint([lat, lng]);
         setUserLocation(null);
       }
     } catch (err) {
-      console.error(err);
+      console.error('Geocoding search failed:', err);
     } finally {
       setLoadingSearch(false);
     }
@@ -634,43 +695,74 @@ export default function FloodMap() {
       {/* Top Floating Header & Controls */}
       <div
         ref={searchContainerRef}
-        className={`absolute ${isSimulatedAlert ? 'top-16' : 'top-4'} left-4 right-4 z-[2000] pointer-events-auto flex flex-col md:flex-row gap-2 max-w-6xl transition-all`}
+        className={`absolute ${isSimulatedAlert ? 'top-16' : 'top-4'} left-4 right-4 z-[2001] pointer-events-auto flex flex-wrap items-center gap-2 max-w-6xl transition-all`}
       >
-        {/* Search Bar */}
-        <form
-          onSubmit={handleSearchSubmit}
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          className="flex-1 flex items-center bg-background/95 backdrop-blur-md border border-border shadow-xl rounded-xl px-3 py-1.5 z-[2001] pointer-events-auto cursor-text focus-within:ring-2 focus-within:ring-brand-500"
-        >
-          <Search className="h-4 w-4 text-muted-foreground mr-2 shrink-0 pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onMouseDown={(e) => e.stopPropagation()}
-            onKeyDown={(e) => {
-              e.stopPropagation();
-              if (e.key === 'Enter') {
-                handleSearchSubmit(e);
-              }
-            }}
-            placeholder="Search Indian city, district, or address (e.g. Guwahati, Wayanad, Mumbai, Odisha)..."
-            className="bg-transparent border-none outline-none text-xs w-full text-foreground placeholder:text-muted-foreground pointer-events-auto cursor-text"
-          />
+        {/* Search Bar / Expanding Search Button */}
+        {!isSearchExpanded ? (
           <button
-            type="submit"
-            disabled={loadingSearch}
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
-              handleSearchSubmit(e);
+              setIsSearchExpanded(true);
             }}
-            className="px-3.5 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-bold transition-all ml-2 shrink-0 cursor-pointer pointer-events-auto shadow-md"
+            onMouseDown={(e) => e.stopPropagation()}
+            className="flex items-center gap-2 px-3.5 py-2 bg-background/95 backdrop-blur-md border border-border shadow-xl rounded-xl text-xs font-bold text-foreground hover:bg-muted hover:border-brand-500/40 transition-all cursor-pointer z-[2001] pointer-events-auto shrink-0 ring-1 ring-border/50"
           >
-            {loadingSearch ? 'Locating...' : 'Search'}
+            <Search className="h-4 w-4 text-brand-500 shrink-0" />
+            <span>Search Location</span>
           </button>
-        </form>
+        ) : (
+          <form
+            onSubmit={handleSearchSubmit}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            className="flex-1 min-w-[280px] max-w-md flex items-center bg-background/95 backdrop-blur-md border border-brand-500/50 shadow-2xl rounded-xl px-3 py-1.5 z-[2001] pointer-events-auto ring-2 ring-brand-500/30 transition-all shrink-0"
+          >
+            <Search className="h-4 w-4 text-brand-500 mr-2 shrink-0 pointer-events-none" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onMouseDown={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === 'Enter') {
+                  handleSearchSubmit(e);
+                } else if (e.key === 'Escape') {
+                  setIsSearchExpanded(false);
+                }
+              }}
+              placeholder="Search Indian city, district, or address (e.g. Delhi, Mumbai, Guwahati)..."
+              className="bg-transparent border-none outline-none text-xs w-full text-foreground placeholder:text-muted-foreground pointer-events-auto cursor-text"
+              autoFocus
+            />
+            <button
+              type="submit"
+              disabled={loadingSearch}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSearchSubmit(e);
+              }}
+              className="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-bold transition-all ml-1.5 shrink-0 cursor-pointer pointer-events-auto shadow-md flex items-center gap-1"
+            >
+              {loadingSearch ? 'Locating...' : 'Go'}
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSearchQuery('');
+                setIsSearchExpanded(false);
+              }}
+              className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors ml-1 shrink-0 cursor-pointer"
+              title="Close search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </form>
+        )}
 
 
         {/* 📢 Prominent "Report Flood / Jal-Bharo (Citizen Desk)" Map Control Button */}

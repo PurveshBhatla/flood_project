@@ -187,3 +187,66 @@ model FloodPredictionRecord {
   recommendation String
   createdAt     DateTime    @default(now())
 }
+
+// ==========================================
+// FLOODWATCH - COMMUNITY WATERLOGGING MODELS
+// ==========================================
+
+model WaterloggingReport {
+  id               String       @id @default(uuid())
+  latitude         Float
+  longitude        Float
+  streetName       String
+  landmark         String?
+  city             String       @default("Mumbai")
+  depthCategory    String       // ANKLE, KNEE, WAIST, SUBMERGED
+  depthCm          Float
+  waterLevelTrend  String       @default("UNKNOWN") // RISING, STABLE, FALLING, UNKNOWN
+  roadCondition    String       @default("UNKNOWN") // PASSABLE, DIFFICULT, BLOCKED, UNKNOWN
+  hazardTags       String       @default("[]") // JSON string: ["OPEN_MANHOLE", "STALLED_VEHICLE"]
+  description      String?
+  photoUrl         String?
+  upvotes          Int          @default(1)
+  status           String       @default("UNVERIFIED") // UNVERIFIED, VERIFIED, RESOLVED, STALE
+  isStale          Boolean      @default(false)
+  priorityScore    Float        @default(0.0) // 0 - 100 calculated
+  isDuplicate      Boolean      @default(false)
+  parentReportId   String?
+  hotspotId        String?
+  hotspot          Hotspot?     @relation(fields: [hotspotId], references: [id], onDelete: SetNull)
+  reportedBy       String?      @default("Citizen Reporter")
+  verifiedAt       DateTime?
+  resolvedAt       DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  actions          IncidentAction[]
+}
+
+model Hotspot {
+  id               String               @id @default(uuid())
+  title            String
+  centerLat        Float
+  centerLng        Float
+  radiusMeters     Float                @default(300.0)
+  reportCount      Int                  @default(1)
+  maxDepthCategory String               @default("KNEE")
+  maxDepthCm       Float                @default(30.0)
+  priorityScore    Float                @default(50.0)
+  status           String               @default("ACTIVE") // ACTIVE, MONITORING, RESOLVED
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  reports          WaterloggingReport[]
+  actions          IncidentAction[]
+}
+
+model IncidentAction {
+  id          String              @id @default(uuid())
+  reportId    String?
+  report      WaterloggingReport? @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  hotspotId   String?
+  hotspot     Hotspot?            @relation(fields: [hotspotId], references: [id], onDelete: Cascade)
+  actionType  String              // STATUS_CHANGE, VERIFY, RESOLVE, MERGE_DUPLICATE, DISPATCH_CREW, NOTE
+  actorName   String              @default("Municipal Operator")
+  notes       String
+  createdAt   DateTime            @default(now())
+}

@@ -1,319 +1,437 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import MapWrapper from '@/components/map/map-wrapper';
 import {
   Waves,
-  ShieldAlert,
-  Activity,
-  Cpu,
   MapPin,
-  Search,
-  Bell,
-  CheckCircle2,
+  ShieldAlert,
+  AlertTriangle,
   ArrowRight,
+  PlusCircle,
+  ListFilter,
+  CheckCircle2,
+  Clock,
+  Layers,
+  Sparkles,
+  RefreshCw,
   TrendingUp,
-  Droplets,
-  Radio,
-  FileText
+  Compass,
+  Building2,
+  Car
 } from 'lucide-react';
-import { getRiskLevelColor } from '@/lib/utils';
+
+interface SystemStats {
+  totalReports: number;
+  verifiedReports: number;
+  unverifiedReports: number;
+  resolvedReports: number;
+  staleReports: number;
+  activeHotspots: number;
+  highPriorityReports: number;
+  avgPriority: number;
+}
+
+interface RecentIncident {
+  id: string;
+  streetName: string;
+  landmark: string | null;
+  city: string;
+  depthCategory: string;
+  depthCm: number;
+  waterLevelTrend: string;
+  roadCondition: string;
+  status: string;
+  priorityScore: number;
+  upvotes: number;
+  createdAt: string;
+}
 
 export default function HomePage() {
-  const [searchLocation, setSearchLocation] = useState('');
-  const [searchResult, setSearchResult] = useState<any>(null);
-  const [loadingSearch, setLoadingSearch] = useState(false);
+  const [stats, setStats] = useState<SystemStats | null>(null);
+  const [recentIncidents, setRecentIncidents] = useState<RecentIncident[]>([]);
+  const [loadingStats, setLoadingStats] = useState(true);
 
-  const handleQuickCheck = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchLocation.trim()) return;
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [statsRes, reportsRes] = await Promise.all([
+          fetch('/api/reports/stats'),
+          fetch('/api/reports?limit=3'),
+        ]);
 
-    setLoadingSearch(true);
-    try {
-      // Geocode city name
-      const geoRes = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchLocation)}`
-      );
-      const geoData = await geoRes.json();
+        if (statsRes.ok) {
+          const statsData = await statsRes.json();
+          if (statsData.success) setStats(statsData.stats);
+        }
 
-      if (geoData && geoData.length > 0) {
-        const lat = parseFloat(geoData[0].lat);
-        const lng = parseFloat(geoData[0].lon);
-
-        const riskRes = await fetch(`/api/flood/risk?lat=${lat}&lng=${lng}`);
-        const riskData = await riskRes.json();
-
-        setSearchResult({
-          name: geoData[0].display_name.split(',')[0],
-          lat,
-          lng,
-          ...riskData,
-        });
-      } else {
-        alert('Location not found. Try searching major cities or river basins.');
+        if (reportsRes.ok) {
+          const reportsData = await reportsRes.json();
+          if (reportsData.success) setRecentIncidents(reportsData.reports || []);
+        }
+      } catch (err) {
+        console.error('Failed to load live statistics:', err);
+      } finally {
+        setLoadingStats(false);
       }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoadingSearch(false);
+    }
+
+    loadData();
+  }, []);
+
+  const getSeverityBadge = (category: string) => {
+    switch (category.toUpperCase()) {
+      case 'SUBMERGED':
+        return { label: 'Severe / Submerged (>90cm)', color: 'bg-red-500/10 text-red-600 border-red-500/30' };
+      case 'WAIST':
+        return { label: 'High / Waist (45-90cm)', color: 'bg-orange-500/10 text-orange-600 border-orange-500/30' };
+      case 'KNEE':
+        return { label: 'Moderate / Knee (15-45cm)', color: 'bg-amber-500/10 text-amber-600 border-amber-500/30' };
+      case 'ANKLE':
+      default:
+        return { label: 'Mild / Ankle (<15cm)', color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' };
     }
   };
 
   return (
     <div className="flex flex-col min-h-screen">
       {/* 1. HERO SECTION */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-brand-950 via-slate-900 to-background text-white py-20 lg:py-28">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-brand-600/20 via-transparent to-transparent pointer-events-none"></div>
+      <section className="relative overflow-hidden bg-gradient-to-b from-slate-950 via-slate-900 to-background text-white py-20 lg:py-28 border-b border-border/40">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-brand-600/25 via-transparent to-transparent pointer-events-none"></div>
 
-        <div className="container mx-auto px-4 md:px-8 relative z-10">
-          <div className="max-w-3xl mx-auto text-center space-y-6">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-brand-500/20 border border-brand-400/30 text-brand-300 text-xs font-semibold tracking-wide uppercase">
-              <Radio className="h-3.5 w-3.5 animate-pulse text-red-400" />
-              Real-Time AI Hydrological Intelligence
-            </div>
-
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight leading-tight">
-              AI-Powered Early Warning & <span className="text-brand-400">Flood Intelligence</span>
-            </h1>
-
-            <p className="text-lg md:text-xl text-slate-300 font-normal leading-relaxed">
-              FloodVision monitors river gauges, satellite soil moisture, and weather forecasts to predict flood risks, deliver life-saving early warnings, and visualize flood inundation zones.
-            </p>
-
-            {/* Quick Check Form */}
-            <form
-              onSubmit={handleQuickCheck}
-              className="mt-8 flex flex-col sm:flex-row items-center gap-2 bg-white/10 backdrop-blur-xl border border-white/20 p-2 rounded-2xl max-w-xl mx-auto shadow-2xl"
-            >
-              <div className="flex-1 flex items-center px-3 w-full">
-                <MapPin className="h-5 w-5 text-brand-400 mr-2 shrink-0" />
-                <input
-                  type="text"
-                  value={searchLocation}
-                  onChange={(e) => setSearchLocation(e.target.value)}
-                  placeholder="Enter city or river location (e.g. Mumbai, Guwahati)..."
-                  className="bg-transparent border-none outline-none text-white text-sm placeholder:text-slate-400 w-full"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={loadingSearch}
-                className="w-full sm:w-auto px-6 py-3 bg-brand-500 hover:bg-brand-600 font-semibold text-sm rounded-xl transition-all shadow-lg flex items-center justify-center gap-2"
-              >
-                {loadingSearch ? (
-                  'Analyzing Risk...'
-                ) : (
-                  <>
-                    <Search className="h-4 w-4" /> Check Area Risk
-                  </>
-                )}
-              </button>
-            </form>
-
-            {/* Quick Search Result Card */}
-            {searchResult && (
-              <div className="mt-6 p-4 rounded-xl bg-slate-800/90 border border-slate-700 text-left max-w-xl mx-auto shadow-xl space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-white text-base">{searchResult.name}</span>
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full text-xs font-bold text-white ${
-                      getRiskLevelColor(searchResult.prediction.riskLevel).badge
-                    }`}
-                  >
-                    {searchResult.prediction.riskLevel} RISK
-                  </span>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-xs text-slate-300 pt-2 border-t border-slate-700">
-                  <div>Risk Score: <strong className="text-white">{searchResult.prediction.riskScore}/100</strong></div>
-                  <div>Rainfall: <strong className="text-white">{searchResult.weather.rainfall} mm</strong></div>
-                  <div>Temp: <strong className="text-white">{searchResult.weather.temperature}°C</strong></div>
-                </div>
-                <p className="text-xs text-slate-300 pt-1 italic">
-                  "{searchResult.prediction.recommendation}"
-                </p>
-                <div className="pt-2 text-right">
-                  <Link href="/map" className="text-xs text-brand-400 hover:underline font-semibold flex items-center justify-end gap-1">
-                    View on Full Interactive Map <ArrowRight className="h-3 w-3" />
-                  </Link>
-                </div>
-              </div>
-            )}
+        <div className="container mx-auto px-4 md:px-8 relative z-10 max-w-5xl text-center space-y-6">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-brand-500/20 border border-brand-400/30 text-brand-300 text-xs font-bold tracking-wide uppercase shadow-sm">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400"></span>
+            </span>
+            Community-Powered Civic Intelligence
           </div>
-        </div>
-      </section>
 
-      {/* 2. SYSTEM LIVE STATS COUNTER */}
-      <section className="py-8 bg-card border-y border-border">
-        <div className="container mx-auto px-4 md:px-8 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-          <div className="space-y-1">
-            <span className="text-3xl font-extrabold text-brand-600">1,240+</span>
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">River Gauge Sensors</p>
-          </div>
-          <div className="space-y-1">
-            <span className="text-3xl font-extrabold text-brand-600">94.8%</span>
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">AI Prediction Accuracy</p>
-          </div>
-          <div className="space-y-1">
-            <span className="text-3xl font-extrabold text-brand-600">15 Mins</span>
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Early Warning Lead Time</p>
-          </div>
-          <div className="space-y-1">
-            <span className="text-3xl font-extrabold text-brand-600">24 / 7</span>
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Automated Telemetry</p>
-          </div>
-        </div>
-      </section>
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-black tracking-tight leading-tight">
+            Flood<span className="text-brand-400">Watch</span> — Community-Powered Waterlogging Intelligence
+          </h1>
 
-      {/* 3. INTERACTIVE MAP PREVIEW */}
-      <section className="py-16 bg-muted/40">
-        <div className="container mx-auto px-4 md:px-8 space-y-8">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-            <div className="space-y-2 max-w-xl">
-              <span className="text-xs font-bold text-brand-600 uppercase tracking-widest">Interactive GIS Map</span>
-              <h2 className="text-3xl font-bold tracking-tight">Real-Time Flood Risk & River Gauges</h2>
-              <p className="text-sm text-muted-foreground">
-                View color-coded flood inundation zones, active emergency warnings, and live water telemetry markers.
-              </p>
-            </div>
+          <p className="text-base sm:text-lg md:text-xl text-slate-300 font-normal leading-relaxed max-w-3xl mx-auto">
+            A crowdsourced urban flood monitoring platform enabling citizens to report street waterlogging with photos, road conditions, and water trends. Powered by spatial duplicate detection and proximity clustering to guide municipal response.
+          </p>
+
+          {/* Primary CTA Buttons */}
+          <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
               href="/map"
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm rounded-xl transition-all shadow-md shrink-0 w-fit"
+              className="w-full sm:w-auto px-7 py-3.5 rounded-2xl bg-brand-600 hover:bg-brand-500 text-white font-extrabold text-sm transition-all shadow-lg shadow-brand-600/30 hover:scale-105 flex items-center justify-center gap-2"
             >
-              Open Fullscreen Interactive Map <ArrowRight className="h-4 w-4" />
+              <MapPin className="h-4 w-4" />
+              View Interactive Live Map
+            </Link>
+
+            <Link
+              href="/report"
+              className="w-full sm:w-auto px-7 py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition-all shadow-lg shadow-amber-500/25 hover:scale-105 flex items-center justify-center gap-2"
+            >
+              <PlusCircle className="h-4 w-4" />
+              Report Waterlogging Incident
+            </Link>
+
+            <Link
+              href="/incidents"
+              className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 border border-slate-700 font-bold text-sm transition-all flex items-center justify-center gap-2"
+            >
+              <ListFilter className="h-4 w-4" />
+              Browse Incidents
             </Link>
           </div>
 
-          <div className="h-[450px] w-full rounded-2xl overflow-hidden shadow-xl border border-border">
-            <MapWrapper />
+          <div className="text-[11px] text-slate-400 pt-2 flex items-center justify-center gap-2 font-medium">
+            <span>✓ OpenStreetMap Powered (Zero Paid Keys)</span>
+            <span>•</span>
+            <span>✓ Transparent 0–100 Priority Scoring</span>
+            <span>•</span>
+            <span>✓ Persistent Database Storage</span>
           </div>
         </div>
       </section>
 
-      {/* 4. HOW FLOODVISION WORKS */}
-      <section className="py-20 bg-background">
-        <div className="container mx-auto px-4 md:px-8 space-y-12">
-          <div className="text-center max-w-2xl mx-auto space-y-3">
-            <span className="text-xs font-bold text-brand-600 uppercase tracking-widest">End-to-End Pipeline</span>
-            <h2 className="text-3xl font-bold tracking-tight">How FloodVision AI Protects Communities</h2>
-            <p className="text-sm text-muted-foreground">
-              From river sensor ingestion to automated localized broadcast alerts in under 60 seconds.
+      {/* 2. REAL SYSTEM STATISTICS (SUPPORTED BY ACTUAL STORED DATABASE DATA) */}
+      <section className="py-10 bg-card border-b border-border">
+        <div className="container mx-auto px-4 md:px-8">
+          <div className="text-center mb-6">
+            <span className="text-[11px] font-extrabold text-brand-600 dark:text-brand-400 uppercase tracking-wider">
+              Live Database Verification
+            </span>
+            <h2 className="text-xl sm:text-2xl font-black text-foreground">
+              Community Waterlogging Reporting Metrics
+            </h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              Real-time counts queried directly from SQLite application database.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="p-6 rounded-2xl bg-card border border-border space-y-4 hover:border-brand-500/50 transition-all shadow-sm">
-              <div className="h-12 w-12 rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-950 flex items-center justify-center">
-                <Droplets className="h-6 w-6" />
-              </div>
-              <h3 className="text-lg font-bold">1. Data Ingestion</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Ingests Open-Meteo rainfall, humidity, river water level gauges, and soil saturation telemetry.
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            <div className="p-5 rounded-2xl bg-muted/40 border border-border text-center space-y-1 shadow-xs">
+              <span className="text-3xl sm:text-4xl font-black text-foreground">
+                {loadingStats ? <RefreshCw className="h-6 w-6 animate-spin mx-auto text-brand-600" /> : stats?.totalReports ?? 0}
+              </span>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                Reports Filed
               </p>
+              <span className="text-[11px] text-muted-foreground block">
+                Logged by community
+              </span>
             </div>
 
-            <div className="p-6 rounded-2xl bg-card border border-border space-y-4 hover:border-brand-500/50 transition-all shadow-sm">
-              <div className="h-12 w-12 rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-950 flex items-center justify-center">
-                <Cpu className="h-6 w-6" />
-              </div>
-              <h3 className="text-lg font-bold">2. AI ML Modeling</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Hydrological scoring model calculates flood probability, risk index (0-100), and confidence ratings.
+            <div className="p-5 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 text-center space-y-1 shadow-xs">
+              <span className="text-3xl sm:text-4xl font-black text-emerald-600 dark:text-emerald-400">
+                {loadingStats ? <RefreshCw className="h-6 w-6 animate-spin mx-auto text-emerald-600" /> : stats?.verifiedReports ?? 0}
+              </span>
+              <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
+                Verified Incidents
               </p>
+              <span className="text-[11px] text-muted-foreground block">
+                Validated by operators
+              </span>
             </div>
 
-            <div className="p-6 rounded-2xl bg-card border border-border space-y-4 hover:border-brand-500/50 transition-all shadow-sm">
-              <div className="h-12 w-12 rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-950 flex items-center justify-center">
-                <Activity className="h-6 w-6" />
-              </div>
-              <h3 className="text-lg font-bold">3. Risk Classification</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Ranks locations into LOW (Green), MODERATE (Yellow), HIGH (Orange), or CRITICAL (Red).
+            <div className="p-5 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-center space-y-1 shadow-xs">
+              <span className="text-3xl sm:text-4xl font-black text-amber-600 dark:text-amber-400">
+                {loadingStats ? <RefreshCw className="h-6 w-6 animate-spin mx-auto text-amber-600" /> : stats?.activeHotspots ?? 0}
+              </span>
+              <p className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
+                Potential Hotspots
               </p>
+              <span className="text-[11px] text-muted-foreground block">
+                Within ~300m clusters
+              </span>
             </div>
 
-            <div className="p-6 rounded-2xl bg-card border border-border space-y-4 hover:border-brand-500/50 transition-all shadow-sm">
-              <div className="h-12 w-12 rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-950 flex items-center justify-center">
-                <Bell className="h-6 w-6" />
-              </div>
-              <h3 className="text-lg font-bold">4. Emergency Warning</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Dispatches localized notifications, evacuation guidance, and broadcasts emergency alerts.
+            <div className="p-5 rounded-2xl bg-cyan-500/5 border border-cyan-500/20 text-center space-y-1 shadow-xs">
+              <span className="text-3xl sm:text-4xl font-black text-cyan-600 dark:text-cyan-400">
+                {loadingStats ? <RefreshCw className="h-6 w-6 animate-spin mx-auto text-cyan-600" /> : stats?.resolvedReports ?? 0}
+              </span>
+              <p className="text-xs font-bold text-cyan-700 dark:text-cyan-400 uppercase tracking-wider">
+                Resolved Locations
               </p>
+              <span className="text-[11px] text-muted-foreground block">
+                Water cleared by civic teams
+              </span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 5. SAFETY & EMERGENCY PREPAREDNESS */}
-      <section className="py-16 bg-brand-950 text-white">
-        <div className="container mx-auto px-4 md:px-8 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          <div className="space-y-6">
-            <span className="text-xs font-bold text-brand-400 uppercase tracking-widest">Disaster Response Ready</span>
-            <h2 className="text-3xl font-bold tracking-tight">Stay Prepared Before Flood Waters Rise</h2>
-            <p className="text-slate-300 text-sm leading-relaxed">
-              FloodVision provides practical step-by-step emergency instructions curated by disaster management authorities for citizens and response teams.
+      {/* 3. PROBLEM & SOLUTION EXPLANATION */}
+      <section className="py-16 container mx-auto px-4 md:px-8 max-w-6xl space-y-12">
+        <div className="text-center max-w-3xl mx-auto space-y-3">
+          <span className="text-xs font-extrabold text-brand-600 dark:text-brand-400 uppercase tracking-widest">
+            Why Traditional Monitoring Fails
+          </span>
+          <h2 className="text-3xl font-black tracking-tight text-foreground">
+            Bridging The Gap Between Regional Flood Alerts & Street Reality
+          </h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Major river gauge sensors and weather radars can forecast regional precipitation, but they cannot see the choked storm drain or flooded underpass causing a 2-hour traffic standstill or submerging vehicles on your street.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="p-6 rounded-2xl bg-card border border-border space-y-3 shadow-xs hover:border-brand-500/50 transition-colors">
+            <div className="h-10 w-10 rounded-xl bg-red-500/10 text-red-600 flex items-center justify-center font-bold">
+              <AlertTriangle className="h-5 w-5" />
+            </div>
+            <h3 className="text-base font-extrabold text-foreground">The Urban Problem</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Monsoon cloudbursts cause rapid, hyper-local waterlogging. Open manholes, stranded autorickshaws, and blocked roads occur in minutes without warning to daily commuters or civic rescue teams.
             </p>
+          </div>
 
-            <ul className="space-y-3 text-sm">
-              <li className="flex items-start gap-2.5">
-                <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
-                <span>Keep 72-hour emergency survival kits packed with clean drinking water and medical supplies.</span>
-              </li>
-              <li className="flex items-start gap-2.5">
-                <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
-                <span>Never walk or drive through flowing flood waters (6 inches of moving water can knock you down).</span>
-              </li>
-              <li className="flex items-start gap-2.5">
-                <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
-                <span>Follow designated evacuation routes provided on your FloodVision dashboard.</span>
-              </li>
-            </ul>
+          <div className="p-6 rounded-2xl bg-card border border-border space-y-3 shadow-xs hover:border-brand-500/50 transition-colors">
+            <div className="h-10 w-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
+              <PlusCircle className="h-5 w-5" />
+            </div>
+            <h3 className="text-base font-extrabold text-foreground">Citizen Telemetry</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Commuters and neighborhood residents report exact street waterlogging depth (Ankle, Knee, Waist, Submerged), road conditions (Passable, Difficult, Blocked), and whether levels are rising or falling.
+            </p>
+          </div>
 
-            <div className="pt-2">
-              <Link
-                href="/safety"
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-500 font-semibold text-sm rounded-xl transition-colors shadow-md"
-              >
-                Read Complete Safety Guide <ArrowRight className="h-4 w-4" />
+          <div className="p-6 rounded-2xl bg-card border border-border space-y-3 shadow-xs hover:border-brand-500/50 transition-colors">
+            <div className="h-10 w-10 rounded-xl bg-brand-500/10 text-brand-600 flex items-center justify-center font-bold">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <h3 className="text-base font-extrabold text-foreground">Spatial Intelligence</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Automated 150m duplicate detection flags redundant entries, 300m proximity clustering creates potential hotspots, and a normalized 0–100 priority score helps municipal desks dispatch dewatering pumps effectively.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* 4. RECENT INCIDENTS FEED PREVIEW */}
+      <section className="py-12 bg-muted/30 border-y border-border">
+        <div className="container mx-auto px-4 md:px-8 max-w-6xl space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <span className="text-[11px] font-extrabold text-brand-600 uppercase tracking-wider">
+                Ground-Truth Community Feed
+              </span>
+              <h2 className="text-2xl font-black text-foreground">
+                Recent Waterlogging Incidents
+              </h2>
+            </div>
+            <Link
+              href="/incidents"
+              className="text-xs font-bold text-brand-600 hover:text-brand-700 dark:text-brand-400 flex items-center gap-1 w-fit"
+            >
+              View Full Incident Register <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+
+          {recentIncidents.length === 0 ? (
+            <div className="p-8 rounded-2xl bg-card border border-border text-center space-y-2">
+              <Clock className="h-8 w-8 text-muted-foreground mx-auto" />
+              <p className="text-sm font-bold text-foreground">No reports recorded yet</p>
+              <p className="text-xs text-muted-foreground">Be the first to report an incident in your area.</p>
+              <Link href="/report" className="inline-block mt-2 px-4 py-2 bg-brand-600 text-white text-xs font-bold rounded-xl">
+                Submit Report
               </Link>
             </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {recentIncidents.map((incident) => {
+                const badge = getSeverityBadge(incident.depthCategory);
+                return (
+                  <div
+                    key={incident.id}
+                    className="p-5 rounded-2xl bg-card border border-border shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between space-y-4"
+                  >
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${badge.color}`}>
+                          {badge.label}
+                        </span>
+                        <span className="text-[10px] font-bold text-muted-foreground">
+                          Priority: <strong className="text-brand-600">{incident.priorityScore}/100</strong>
+                        </span>
+                      </div>
+
+                      <h4 className="font-extrabold text-sm text-foreground leading-snug line-clamp-2">
+                        {incident.streetName}
+                      </h4>
+                      {incident.landmark && (
+                        <p className="text-xs text-muted-foreground">
+                          Near {incident.landmark}
+                        </p>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
+                        <div className="bg-muted/60 p-2 rounded-xl">
+                          <span className="text-muted-foreground block text-[10px]">Water Trend:</span>
+                          <span className="font-bold text-foreground">{incident.waterLevelTrend}</span>
+                        </div>
+                        <div className="bg-muted/60 p-2 rounded-xl">
+                          <span className="text-muted-foreground block text-[10px]">Road Status:</span>
+                          <span className="font-bold text-foreground">{incident.roadCondition}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-border/50 flex items-center justify-between text-[11px]">
+                      <span className={`font-bold flex items-center gap-1 ${
+                        incident.status === 'VERIFIED' ? 'text-emerald-600' :
+                        incident.status === 'RESOLVED' ? 'text-cyan-600' :
+                        incident.status === 'STALE' ? 'text-muted-foreground' : 'text-amber-600'
+                      }`}>
+                        {incident.status === 'VERIFIED' && <CheckCircle2 className="h-3.5 w-3.5" />}
+                        {incident.status}
+                      </span>
+                      <Link
+                        href={`/map?focus=${incident.id}`}
+                        className="text-brand-600 hover:underline font-bold flex items-center gap-1"
+                      >
+                        Locate on Map <ArrowRight className="h-3 w-3" />
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* 5. HOW IT WORKS / METHODOLOGY OVERVIEW */}
+      <section className="py-16 container mx-auto px-4 md:px-8 max-w-6xl space-y-10">
+        <div className="text-center max-w-2xl mx-auto space-y-2">
+          <span className="text-xs font-extrabold text-brand-600 uppercase tracking-widest">
+            Algorithmic Pipeline
+          </span>
+          <h2 className="text-3xl font-black text-foreground">
+            How Community Intelligence Powers Decision-Making
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="p-5 rounded-2xl bg-card border border-border space-y-2 text-center shadow-xs">
+            <div className="h-10 w-10 mx-auto rounded-xl bg-brand-600/10 text-brand-600 flex items-center justify-center font-black text-sm">
+              1
+            </div>
+            <h4 className="font-extrabold text-sm text-foreground">1. Citizen Entry</h4>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Residents record GPS coordinates, photo evidence, depth category, and road blockage.
+            </p>
           </div>
 
-          <div className="p-8 rounded-2xl bg-slate-900 border border-slate-800 space-y-6 shadow-2xl">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <h3 className="font-bold text-lg flex items-center gap-2">
-                <ShieldAlert className="h-5 w-5 text-red-500" /> Emergency Hotline Directory
-              </h3>
-              <span className="text-xs text-slate-400">24/7 Toll-Free</span>
+          <div className="p-5 rounded-2xl bg-card border border-border space-y-2 text-center shadow-xs">
+            <div className="h-10 w-10 mx-auto rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-black text-sm">
+              2
             </div>
-
-            <div className="space-y-3">
-              <div className="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/60 flex items-center justify-between">
-                <div>
-                  <span className="text-xs text-slate-400 block">National Emergency Helpline</span>
-                  <span className="text-base font-bold text-white">112 / 911</span>
-                </div>
-                <span className="px-2.5 py-1 rounded bg-red-500/20 text-red-400 text-xs font-bold">ALL STATES</span>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/60 flex items-center justify-between">
-                <div>
-                  <span className="text-xs text-slate-400 block">Disaster Relief Response Force</span>
-                  <span className="text-base font-bold text-white">108 / 011-24363260</span>
-                </div>
-                <span className="px-2.5 py-1 rounded bg-amber-500/20 text-amber-400 text-xs font-bold">RESCUE OPS</span>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/60 flex items-center justify-between">
-                <div>
-                  <span className="text-xs text-slate-400 block">Flood Meteorological Cell</span>
-                  <span className="text-base font-bold text-white">1800-180-1717</span>
-                </div>
-                <span className="px-2.5 py-1 rounded bg-blue-500/20 text-blue-400 text-xs font-bold">WEATHER BULLETIN</span>
-              </div>
-            </div>
+            <h4 className="font-extrabold text-sm text-foreground">2. 150m Duplicate Check</h4>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Haversine formula identifies reports within 150m, linking duplicates without discarding data.
+            </p>
           </div>
+
+          <div className="p-5 rounded-2xl bg-card border border-border space-y-2 text-center shadow-xs">
+            <div className="h-10 w-10 mx-auto rounded-xl bg-cyan-500/10 text-cyan-600 flex items-center justify-center font-black text-sm">
+              3
+            </div>
+            <h4 className="font-extrabold text-sm text-foreground">3. 300m Hotspots</h4>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Spatial clustering aggregates reports into Potential Waterlogging Hotspots for civic pump units.
+            </p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-card border border-border space-y-2 text-center shadow-xs">
+            <div className="h-10 w-10 mx-auto rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-black text-sm">
+              4
+            </div>
+            <h4 className="font-extrabold text-sm text-foreground">4. Priority Dispatch</h4>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              0–100 priority score evaluates depth, trend, road blockage, density, and recency decay.
+            </p>
+          </div>
+        </div>
+
+        {/* Administrative Portal Callout */}
+        <div className="p-8 rounded-3xl bg-gradient-to-r from-slate-900 to-brand-950 text-white border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
+          <div className="space-y-2 text-left">
+            <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-black uppercase">
+              Municipal & Disaster Response Desk
+            </span>
+            <h3 className="text-xl font-black">
+              Authorized Civic Operator Interface
+            </h3>
+            <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
+              Authorized municipal administrators can review citizen submissions, verify ground-truth telemetry, mark resolved drains, and track action audit trails.
+            </p>
+          </div>
+          <Link
+            href="/admin"
+            className="px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shrink-0 transition-transform hover:scale-105 shadow-md"
+          >
+            Access Admin Command Portal
+          </Link>
         </div>
       </section>
     </div>

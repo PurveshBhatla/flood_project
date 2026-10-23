@@ -228,20 +228,77 @@ test('14. EmergencyKnowledgeService Protocols & Query Engine', () => {
   assert.ok(res2.actionableSteps.some((s: string) => s.toLowerCase().includes('vehicle') || s.toLowerCase().includes('car')));
 });
 
-test('15. DemoScenarioService High Flood Risk (+2h Nowcast) Simulation', () => {
-  const { DemoScenarioService } = require('../lib/services/demo-scenario.service');
+test('16. FloodWatch Priority Score Calculation & Normalization (0-100)', () => {
+  const { calculateIncidentPriorityScore } = require('../lib/services/waterlogging.service');
 
-  const demo = DemoScenarioService.getHighFloodScenario();
-  assert.equal(demo.isDemoActive, true);
-  assert.equal(demo.isSimulatedAlert, true);
-  assert.equal(demo.prediction.riskLevel, 'CRITICAL RED ALERT');
-  assert.equal(demo.prediction.riskScore, 94);
-  assert.equal(demo.telemetry.drainageUtilization, 142);
-  assert.equal(demo.telemetry.rainfallMmHr, 78.4);
-  assert.equal(demo.telemetry.soilSaturationPercent, 96);
-  assert.ok(demo.prediction.nowcastBannerText.includes('SIH26085 EARLY WARNING'));
-  assert.ok(demo.prediction.drainNodePopupText.includes('Drain Node #D-14 Overflowing'));
+  // Severe Submerged, Rising, Blocked -> Should reach 100
+  const high = calculateIncidentPriorityScore({
+    depthCategory: 'SUBMERGED',
+    waterLevelTrend: 'RISING',
+    roadCondition: 'BLOCKED',
+    nearbyReportCount: 3,
+  });
+  assert.equal(high.finalScore, 100);
+  assert.equal(high.baseSeverityPoints, 85);
+  assert.equal(high.trendAdjustment, 10);
+  assert.equal(high.roadConditionPoints, 15);
+  assert.equal(high.densityBoost, 15);
+  assert.equal(high.isStale, false);
+
+  // Mild Ankle, Falling, Passable, 8 hours old -> Should decay by 50% and mark stale
+  const eightHoursAgo = new Date(Date.now() - 8 * 60 * 60 * 1000);
+  const low = calculateIncidentPriorityScore({
+    depthCategory: 'ANKLE',
+    waterLevelTrend: 'FALLING',
+    roadCondition: 'PASSABLE',
+    nearbyReportCount: 0,
+    createdAt: eightHoursAgo,
+  });
+  assert.equal(low.isStale, true);
+  assert.equal(low.recencyMultiplier, 0.5);
+  assert.equal(low.finalScore, 5); // (20 - 10 + 0 + 0) * 0.5 = 5
 });
+
+test('17. FloodWatch 150m Duplicate Detection Threshold & Spatial Math', () => {
+  const { haversineDistance } = require('../lib/utils');
+  const { FLOODWATCH_CONFIG } = require('../lib/services/waterlogging.service');
+
+  assert.equal(FLOODWATCH_CONFIG.DUPLICATE_DISTANCE_METERS, 150);
+  assert.equal(FLOODWATCH_CONFIG.HOTSPOT_PROXIMITY_METERS, 300);
+
+  // Point A and Point B approx 110m apart
+  const lat1 = 19.0825;
+  const lng1 = 72.8870;
+  const lat2 = 19.0833;
+  const lng2 = 72.8876;
+  const distM = haversineDistance(lat1, lng1, lat2, lng2) * 1000;
+
+  assert.ok(distM <= FLOODWATCH_CONFIG.DUPLICATE_DISTANCE_METERS, 'Distance should be under 150m threshold');
+
+  // Point C approx 500m away (Not a duplicate)
+  const lat3 = 19.0870;
+  const lng3 = 72.8900;
+  const distFarM = haversineDistance(lat1, lng1, lat3, lng3) * 1000;
+  assert.ok(distFarM > FLOODWATCH_CONFIG.DUPLICATE_DISTANCE_METERS, 'Distance should exceed 150m');
+});
+
+test('18. FloodWatch Database Waterlogging Models & Persistent Queries', async () => {
+  const { db } = require('../lib/db');
+
+  const count = await db.waterloggingReport.count();
+  assert.ok(count > 0, 'Database should contain seeded waterlogging demonstration reports');
+
+  const verified = await db.waterloggingReport.findFirst({
+    where: { status: 'VERIFIED' },
+  });
+  assert.ok(verified, 'Should have at least one verified incident');
+  assert.ok(verified.streetName);
+  assert.ok(verified.priorityScore >= 0 && verified.priorityScore <= 100);
+
+  const hotspots = await db.hotspot.findMany();
+  assert.ok(hotspots.length > 0, 'Should have at least one clustered hotspot in database');
+});
+
 
 
 

@@ -127,21 +127,47 @@ export default function CitizenReportModal() {
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    setTimeout(() => {
+    try {
       const activeOption = DEPTH_OPTIONS[selectedDepthIndex];
-      const now = new Date();
-      const timestampText = `Just now - ${now.toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-      })}`;
+      const categoryEnum =
+        selectedDepthIndex === 0
+          ? 'ANKLE'
+          : selectedDepthIndex === 1
+          ? 'KNEE'
+          : selectedDepthIndex === 2
+          ? 'WAIST'
+          : 'SUBMERGED';
+
+      const numericDepth =
+        selectedDepthIndex === 0 ? 15 : selectedDepthIndex === 1 ? 35 : selectedDepthIndex === 2 ? 65 : 105;
+
+      const payload = {
+        latitude: coords.lat,
+        longitude: coords.lng,
+        streetName: streetName.trim() || 'Monitored Street',
+        depthCategory: categoryEnum,
+        depthCm: numericDepth,
+        waterLevelTrend: 'RISING',
+        roadCondition: selectedDepthIndex >= 2 ? 'BLOCKED' : 'DIFFICULT',
+        hazardTags: selectedTags.length > 0 ? selectedTags : ['DRAIN_OVERFLOW'],
+        photoUrl: previewUrl || undefined,
+        reportedBy: 'Citizen Reporter',
+      };
+
+      const res = await fetch('/api/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
 
       const newReport: CitizenReport = {
-        id: `cit-rep-${Date.now()}`,
+        id: data?.report?.id || `cit-rep-${Date.now()}`,
         latitude: coords.lat,
         longitude: coords.lng,
         streetName: streetName.trim() || 'Monitored Flood Zone',
@@ -150,9 +176,9 @@ export default function CitizenReportModal() {
         aiEstimate: activeOption.aiEstimateText,
         tags: selectedTags.length > 0 ? selectedTags : ['Stagnant Water'],
         imageUrl: previewUrl || undefined,
-        timestamp: timestampText,
+        timestamp: 'Just now',
         votes: 1,
-        status: 'Citizen Verified (1 Vote)',
+        status: data?.report?.status || 'Unverified',
       };
 
       addReport(newReport);
@@ -162,12 +188,14 @@ export default function CitizenReportModal() {
       setTimeout(() => {
         setShowSuccessToast(false);
         closeReportModal();
-        // Reset form
         setSelectedFile(null);
         setPreviewUrl(null);
-        setSelectedTags(['Drain Overflowing']);
       }, 1200);
-    }, 1000);
+    } catch (err) {
+      console.error('Error saving citizen report in modal:', err);
+      setIsSubmitting(false);
+      closeReportModal();
+    }
   };
 
   return (

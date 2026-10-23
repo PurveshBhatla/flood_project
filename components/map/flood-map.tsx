@@ -84,11 +84,10 @@ const shelterIcon = (color: string, isNearest: boolean = false) =>
         height: ${isNearest ? '36px' : '30px'};
         border-radius: 50%;
         border: ${isNearest ? '3px solid #ffffff' : '2px solid #ffffff'};
-        box-shadow: ${
-          isNearest
-            ? '0 0 0 5px rgba(16, 185, 129, 0.5), 0 4px 14px rgba(0,0,0,0.6)'
-            : '0 4px 10px rgba(0,0,0,0.4)'
-        };
+        box-shadow: ${isNearest
+        ? '0 0 0 5px rgba(16, 185, 129, 0.5), 0 4px 14px rgba(0,0,0,0.6)'
+        : '0 4px 10px rgba(0,0,0,0.4)'
+      };
         display: flex;
         align-items: center;
         justify-content: center;
@@ -192,29 +191,81 @@ const safeRouteCoords: [number, number][] = [
 ];
 
 
-const citizenReportIcon = () =>
-  L.divIcon({
-    className: 'custom-citizen-pin',
+const getWaterloggingMarkerIcon = (
+  depthCategory: string,
+  status: string,
+  isDuplicate: boolean = false
+) => {
+  let color = '#f59e0b';
+  let badgeEmoji = '🌊';
+  const isVerified = status === 'VERIFIED';
+  const isResolved = status === 'RESOLVED';
+  const isStale = status === 'STALE';
+
+  if (isResolved) {
+    color = '#06b6d4';
+    badgeEmoji = '✅';
+  } else if (isStale) {
+    color = '#64748b';
+    badgeEmoji = '🕒';
+  } else {
+    switch ((depthCategory || '').toUpperCase()) {
+      case 'SUBMERGED':
+        color = '#ef4444';
+        badgeEmoji = '🚨';
+        break;
+      case 'WAIST':
+        color = '#f97316';
+        badgeEmoji = '⚠️';
+        break;
+      case 'KNEE':
+        color = '#f59e0b';
+        badgeEmoji = '🌊';
+        break;
+      case 'ANKLE':
+      default:
+        color = '#10b981';
+        badgeEmoji = '💧';
+        break;
+    }
+  }
+
+  const borderStyle = isVerified
+    ? 'border: 3px solid #ffffff; box-shadow: 0 0 0 3px #10b981, 0 4px 14px rgba(0,0,0,0.5);'
+    : isDuplicate
+    ? 'border: 2px dashed #a855f7; box-shadow: 0 4px 10px rgba(0,0,0,0.3);'
+    : 'border: 2px dashed #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.4);';
+
+  return L.divIcon({
+    className: 'custom-waterlogging-pin',
     html: `
       <div style="
-        background-color: #f59e0b;
-        color: white;
-        width: 34px;
-        height: 34px;
+        background-color: ${color};
+        width: 36px;
+        height: 36px;
         border-radius: 50%;
-        border: 3px solid white;
-        box-shadow: 0 0 16px rgba(245, 158, 11, 0.8), 0 4px 12px rgba(0,0,0,0.5);
+        ${borderStyle}
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 16px;
+        color: white;
+        position: relative;
       ">
-        📢
+        ${badgeEmoji}
+        ${
+          isVerified
+            ? '<span style="position: absolute; top: -5px; right: -5px; background: #10b981; color: white; border-radius: 50%; width: 15px; height: 15px; font-size: 9px; font-weight: 900; display: flex; align-items: center; justify-content: center; border: 1.5px solid white;">✓</span>'
+            : ''
+        }
       </div>
     `,
-    iconSize: [34, 34],
-    iconAnchor: [17, 17],
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
   });
+};
+
+const citizenReportIcon = () => getWaterloggingMarkerIcon('KNEE', 'UNVERIFIED');
 
 function MapRecenter({ center, zoom = 6 }: { center: [number, number]; zoom?: number }) {
   const map = useMap();
@@ -285,8 +336,12 @@ export default function FloodMap() {
   }, []);
 
   // Default to India-wide view
-  const [center, setCenter] = useState<[number, number]>([22.5937, 78.9629]);
-  const [zoomLevel, setZoomLevel] = useState<number>(5);
+  const [center, setCenter] = useState<[number, number]>([19.076, 72.8777]);
+  const [zoomLevel, setZoomLevel] = useState<number>(12);
+
+  // Persistent waterlogging reports and potential hotspots from SQLite DB
+  const [dbReports, setDbReports] = useState<any[]>([]);
+  const [dbHotspots, setDbHotspots] = useState<any[]>([]);
 
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
 
@@ -594,12 +649,53 @@ export default function FloodMap() {
     fetch('/api/flood/stations')
       .then((res) => res.json())
       .then((d) => setStations(d.stations || []))
-      .catch(() => {});
+      .catch(() => { });
 
     fetch('/api/alerts')
       .then((res) => res.json())
       .then((d) => setAlerts(d.alerts || []))
-      .catch(() => {});
+      .catch(() => { });
+
+    // Fetch live FloodWatch persistent waterlogging reports from database
+    fetch('/api/reports?limit=100')
+      .then((res) => res.json())
+      .then((d) => {
+        if (d.success && d.reports) {
+          setDbReports(d.reports);
+
+          // Check if URL has focus or lat/lng params
+          if (typeof window !== 'undefined') {
+            const sp = new URLSearchParams(window.location.search);
+            const focusId = sp.get('focus');
+            const qLat = sp.get('lat');
+            const qLng = sp.get('lng');
+            if (qLat && qLng) {
+              setCenter([parseFloat(qLat), parseFloat(qLng)]);
+              setZoomLevel(15);
+            } else if (focusId) {
+              const matched = d.reports.find((r: any) => r.id === focusId);
+              if (matched) {
+                setCenter([matched.latitude, matched.longitude]);
+                setZoomLevel(15);
+              }
+            } else if (d.reports.length > 0) {
+              setCenter([d.reports[0].latitude, d.reports[0].longitude]);
+              setZoomLevel(13);
+            }
+          }
+        }
+      })
+      .catch(() => { });
+
+    // Fetch active potential hotspots (300m clusters)
+    fetch('/api/hotspots')
+      .then((res) => res.json())
+      .then((d) => {
+        if (d.success && d.hotspots) {
+          setDbHotspots(d.hotspots);
+        }
+      })
+      .catch(() => { });
   }, []);
 
   // Judge Demo Simulation Auto-Play Loop
@@ -788,11 +884,10 @@ export default function FloodMap() {
               }
             }
           }}
-          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-extrabold rounded-xl transition-all shadow-lg shrink-0 border ${
-            showShelterPanel
+          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-extrabold rounded-xl transition-all shadow-lg shrink-0 border ${showShelterPanel
               ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-400 ring-2 ring-emerald-500/40'
               : 'bg-background/95 backdrop-blur-md border-border hover:bg-muted text-foreground'
-          }`}
+            }`}
         >
           <span className="text-base">🏠</span>
           <span>Nearest Safe Shelters</span>
@@ -905,11 +1000,10 @@ export default function FloodMap() {
         {/* Judge Demo Simulation Launcher */}
         <button
           onClick={() => setIsSimulating(!isSimulating)}
-          className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl transition-all shadow-md shrink-0 ${
-            isSimulating
+          className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl transition-all shadow-md shrink-0 ${isSimulating
               ? 'bg-amber-500 hover:bg-amber-600 text-white animate-pulse'
               : 'bg-red-600 hover:bg-red-700 text-white'
-          }`}
+            }`}
         >
           {isSimulating ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
           {isSimulating ? 'SIMULATING 0-3H FLOOD...' : 'SIMULATE FLOOD NOWCAST'}
@@ -945,8 +1039,8 @@ export default function FloodMap() {
                     {activeLocationType === 'GPS'
                       ? 'Your GPS Location'
                       : activeLocationType === 'MAP_CLICK'
-                      ? `Selected Point (${activeLocation[0].toFixed(3)}, ${activeLocation[1].toFixed(3)})`
-                      : 'Map Center'}
+                        ? `Selected Point (${activeLocation[0].toFixed(3)}, ${activeLocation[1].toFixed(3)})`
+                        : 'Map Center'}
                   </strong>
                 </span>
               </div>
@@ -974,13 +1068,12 @@ export default function FloodMap() {
                     <button
                       key={shelter.id}
                       onClick={() => handleFocusShelter(shelter)}
-                      className={`w-full text-left p-3 rounded-xl border transition-all space-y-2 ${
-                        isSelected
+                      className={`w-full text-left p-3 rounded-xl border transition-all space-y-2 ${isSelected
                           ? 'bg-emerald-500/10 border-emerald-500 ring-2 ring-emerald-500/30 shadow-md'
                           : isTopRank
-                          ? 'bg-card border-emerald-500/60 shadow-sm hover:border-emerald-500'
-                          : 'bg-card border-border hover:border-muted-foreground/40'
-                      }`}
+                            ? 'bg-card border-emerald-500/60 shadow-sm hover:border-emerald-500'
+                            : 'bg-card border-border hover:border-muted-foreground/40'
+                        }`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="space-y-0.5">
@@ -995,8 +1088,8 @@ export default function FloodMap() {
                           {shelter.status === 'AVAILABLE'
                             ? '🟢 AVAILABLE'
                             : shelter.status === 'LIMITED'
-                            ? '🟡 LIMITED'
-                            : '🔴 FULL'}
+                              ? '🟡 LIMITED'
+                              : '🔴 FULL'}
                         </span>
                       </div>
 
@@ -1145,9 +1238,8 @@ export default function FloodMap() {
             <button
               key={step}
               onClick={() => setForecastMinutes(step)}
-              className={`hover:text-brand-600 transition-colors ${
-                forecastMinutes === step ? 'text-brand-600 font-extrabold scale-110' : ''
-              }`}
+              className={`hover:text-brand-600 transition-colors ${forecastMinutes === step ? 'text-brand-600 font-extrabold scale-110' : ''
+                }`}
             >
               {step === 0 ? 'NOW' : `${step}m`}
             </button>
@@ -1298,8 +1390,8 @@ export default function FloodMap() {
                           {shelter.status === 'AVAILABLE'
                             ? '🟢 AVAILABLE'
                             : shelter.status === 'LIMITED'
-                            ? '🟡 LIMITED'
-                            : '🔴 FULL'}
+                              ? '🟡 LIMITED'
+                              : '🔴 FULL'}
                         </span>
                       </div>
                       <div className="pt-1 border-t border-border flex items-center justify-between text-[10px] text-amber-500 font-extrabold uppercase">
@@ -1561,69 +1653,119 @@ export default function FloodMap() {
           </React.Fragment>
         )}
 
-        {/* 📢 CITIZEN VERIFIED INCIDENT MARKERS ON MAP */}
-        {citizenReports.map((report) => (
+        {/* 📢 PERSISTENT VERIFIED & COMMUNITY INCIDENTS FROM DATABASE */}
+        {dbReports.map((report) => (
           <Marker
-            key={`cit-marker-${report.id}`}
+            key={`db-marker-${report.id}`}
             position={[report.latitude, report.longitude]}
-            icon={citizenReportIcon()}
+            icon={getWaterloggingMarkerIcon(report.depthCategory, report.status, report.isDuplicate)}
           >
             <Popup autoPan={true}>
-              <div className="p-2.5 space-y-2 text-xs min-w-[240px] max-w-[280px]">
-                <div className="flex items-center justify-between border-b border-amber-500/40 pb-1">
-                  <span className="font-extrabold text-amber-600 dark:text-amber-400 flex items-center gap-1.5 text-xs">
-                    📢 Citizen Verified Incident
+              <div className="p-3 space-y-2 text-xs min-w-[260px] max-w-[290px]">
+                <div className="flex items-center justify-between border-b border-border pb-1.5">
+                  <span className={`font-black text-xs flex items-center gap-1 ${
+                    report.status === 'VERIFIED' ? 'text-emerald-600' :
+                    report.status === 'RESOLVED' ? 'text-cyan-600' :
+                    report.status === 'STALE' ? 'text-slate-500' : 'text-amber-600'
+                  }`}>
+                    {report.status === 'VERIFIED' ? '✅ Verified Incident' :
+                     report.status === 'RESOLVED' ? '🟢 Resolved Waterlogging' :
+                     report.status === 'STALE' ? '🕒 Potentially Stale' : '📢 Community Report'}
                   </span>
-                  <span className="px-2 py-0.5 rounded bg-amber-500 text-slate-950 font-black text-[9px] uppercase">
-                    GROUND-TRUTH
+                  <span className="px-2 py-0.5 rounded bg-brand-600 text-white font-black text-[9px] uppercase">
+                    Priority: {report.priorityScore}/100
                   </span>
                 </div>
 
-                {/* Uploaded Image Preview if present */}
-                {report.imageUrl && (
-                  <div className="rounded-xl overflow-hidden border border-border shadow-sm">
+                {/* Attached Photo Preview */}
+                {report.photoUrl && (
+                  <div className="rounded-xl overflow-hidden border border-border shadow-xs">
                     <img
-                      src={report.imageUrl}
-                      alt="Citizen Flood Report"
+                      src={report.photoUrl}
+                      alt="Incident photograph evidence"
                       className="w-full h-32 object-cover"
                     />
                   </div>
                 )}
 
-                <div className="space-y-1 text-[11px]">
+                <div className="space-y-1.5 text-[11px]">
                   <h4 className="font-extrabold text-foreground text-xs leading-snug">
                     {report.streetName}
                   </h4>
-                  <div className="flex items-center justify-between pt-0.5">
-                    <span className="text-muted-foreground">Water Depth:</span>
-                    <strong className="text-red-600 dark:text-red-400 font-extrabold text-xs">
-                      {report.waterDepth} ({report.waterDepthCategory})
-                    </strong>
+                  {report.landmark && (
+                    <p className="text-muted-foreground text-[10px]">
+                      Near {report.landmark}, {report.city}
+                    </p>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-1.5 pt-1 text-[10px]">
+                    <div className="p-1.5 rounded-lg bg-muted/80">
+                      <span className="text-muted-foreground block text-[9px] font-bold">Severity Depth:</span>
+                      <strong className="text-foreground">{report.depthCategory} ({report.depthCm} cm)</strong>
+                    </div>
+                    <div className="p-1.5 rounded-lg bg-muted/80">
+                      <span className="text-muted-foreground block text-[9px] font-bold">Road Status:</span>
+                      <strong className="text-foreground">{report.roadCondition}</strong>
+                    </div>
                   </div>
 
-                  <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[10px] text-amber-600 font-bold">
-                    {report.aiEstimate}
+                  <div className="p-1.5 rounded-lg bg-muted/50 text-[10px] flex items-center justify-between">
+                    <span className="text-muted-foreground">Water Trend:</span>
+                    <strong className="text-foreground">{report.waterLevelTrend}</strong>
                   </div>
 
-                  <div className="flex flex-wrap gap-1 pt-1">
-                    {report.tags.map((t, idx) => (
-                      <span
-                        key={idx}
-                        className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground text-[9px] font-bold"
-                      >
-                        #{t}
-                      </span>
-                    ))}
-                  </div>
+                  {report.isDuplicate && (
+                    <div className="p-1 rounded bg-purple-500/10 text-purple-700 dark:text-purple-400 text-[9.5px] font-bold border border-purple-500/20">
+                      Linked Proximity Duplicate (~150m)
+                    </div>
+                  )}
 
-                  <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1.5 border-t border-border/40">
-                    <span>{report.timestamp}</span>
-                    <strong className="text-emerald-600 font-extrabold">{report.status}</strong>
+                  {report.description && (
+                    <p className="text-muted-foreground italic text-[10px] pt-1 border-t border-border/50">
+                      "{report.description}"
+                    </p>
+                  )}
+
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1.5 border-t border-border">
+                    <span>{new Date(report.createdAt).toLocaleDateString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                    <span className="font-black text-brand-600">{report.upvotes} Upvotes</span>
                   </div>
                 </div>
               </div>
             </Popup>
           </Marker>
+        ))}
+
+        {/* ⭕ POTENTIAL WATERLOGGING HOTSPOTS (300M PROXIMITY CLUSTERS) */}
+        {dbHotspots.map((hs) => (
+          <Circle
+            key={`hotspot-circle-${hs.id}`}
+            center={[hs.centerLat, hs.centerLng]}
+            radius={hs.radiusMeters || 300}
+            pathOptions={{
+              color: '#f59e0b',
+              fillColor: '#f59e0b',
+              fillOpacity: 0.16,
+              weight: 2,
+              dashArray: '6, 6',
+            }}
+          >
+            <Popup autoPan={true}>
+              <div className="p-2 space-y-1 text-xs max-w-[240px]">
+                <div className="flex items-center gap-1 text-amber-600 font-extrabold text-xs">
+                  <span>⚠️ Potential Waterlogging Hotspot</span>
+                </div>
+                <p className="font-bold text-foreground text-[11px]">{hs.title}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {hs.reportCount} nearby reports clustered within ~300m radius.
+                </p>
+                <div className="text-[10px] pt-1 border-t border-border flex justify-between font-bold">
+                  <span>Max Depth: {hs.maxDepthCategory}</span>
+                  <span className="text-brand-600">Priority: {hs.priorityScore}/100</span>
+                </div>
+              </div>
+            </Popup>
+          </Circle>
         ))}
       </MapContainer>
 

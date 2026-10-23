@@ -7,6 +7,9 @@ async function main() {
   console.log('🌱 Starting SIH26085 FloodVision Master Database Seed...');
 
   // Clean existing tables
+  await prisma.incidentAction.deleteMany({});
+  await prisma.waterloggingReport.deleteMany({});
+  await prisma.hotspot.deleteMany({});
   await prisma.floodPredictionRecord.deleteMany({});
   await prisma.roadSegment.deleteMany({});
   await prisma.road.deleteMany({});
@@ -272,7 +275,245 @@ async function main() {
     ],
   });
 
-  console.log('🎉 SIH26085 Master Database Seeding Completed Successfully!');
+  // 8. FloodWatch Community Waterlogging Demonstration Data
+  console.log('🌊 Seeding FloodWatch demonstration waterlogging reports...');
+
+  const hotspotKurla = await prisma.hotspot.create({
+    data: {
+      title: 'Potential Hotspot: LBS Marg / Phoenix Junction Corridor (2 reports)',
+      centerLat: 19.0829,
+      centerLng: 72.8873,
+      radiusMeters: 300,
+      reportCount: 2,
+      maxDepthCategory: 'WAIST',
+      maxDepthCm: 70.0,
+      priorityScore: 80.0,
+      status: 'ACTIVE',
+    },
+  });
+
+  const rep1 = await prisma.waterloggingReport.create({
+    data: {
+      latitude: 19.0657,
+      longitude: 72.8784,
+      streetName: 'Kurla West Station Subway Underpass',
+      landmark: 'Near Platform 1 Exit, Kurla West',
+      city: 'Mumbai',
+      depthCategory: 'SUBMERGED',
+      depthCm: 110.0,
+      waterLevelTrend: 'RISING',
+      roadCondition: 'BLOCKED',
+      hazardTags: JSON.stringify(['STALLED_VEHICLE', 'OPEN_MANHOLE', 'FAST_CURRENT']),
+      description: 'Underpass completely flooded beyond vehicular clearance. 2 auto-rickshaws stalled. Water rising rapidly with tidal backflow.',
+      upvotes: 14,
+      status: 'VERIFIED',
+      priorityScore: 95.0,
+      isDuplicate: false,
+      reportedBy: 'Aakash Verma (Citizen Reporter)',
+      verifiedAt: new Date(Date.now() - 30 * 60 * 1000),
+      createdAt: new Date(Date.now() - 45 * 60 * 1000),
+      actions: {
+        create: [
+          {
+            actionType: 'REPORT_CREATED',
+            actorName: 'Aakash Verma (Citizen Reporter)',
+            notes: 'Initial report submitted via GPS location.',
+            createdAt: new Date(Date.now() - 45 * 60 * 1000),
+          },
+          {
+            actionType: 'VERIFY',
+            actorName: 'Municipal Disaster Desk (Ward L)',
+            notes: 'Field officer verified: subway blocked, police barricades placed.',
+            createdAt: new Date(Date.now() - 30 * 60 * 1000),
+          },
+        ],
+      },
+    },
+  });
+
+  const rep2 = await prisma.waterloggingReport.create({
+    data: {
+      latitude: 19.0825,
+      longitude: 72.8870,
+      streetName: 'LBS Marg near Phoenix Mall Junction',
+      landmark: 'Opposite Main Entrance Gate',
+      city: 'Mumbai',
+      depthCategory: 'WAIST',
+      depthCm: 70.0,
+      waterLevelTrend: 'RISING',
+      roadCondition: 'BLOCKED',
+      hazardTags: JSON.stringify(['DRAIN_OVERFLOW', 'HEAVY_TRAFFIC']),
+      description: 'Storm drain regurgitating onto arterial road. Water level reaching car bonnets, traffic at a standstill.',
+      upvotes: 8,
+      status: 'UNVERIFIED',
+      priorityScore: 82.0,
+      isDuplicate: false,
+      hotspotId: hotspotKurla.id,
+      reportedBy: 'Pooja Iyer (Commuter)',
+      createdAt: new Date(Date.now() - 25 * 60 * 1000),
+      actions: {
+        create: [
+          {
+            actionType: 'REPORT_CREATED',
+            actorName: 'Pooja Iyer (Commuter)',
+            notes: 'Citizen submitted report with rising water level trend.',
+            createdAt: new Date(Date.now() - 25 * 60 * 1000),
+          },
+        ],
+      },
+    },
+  });
+
+  // Duplicate report candidate (~110m away from rep2, demonstrating 150m duplicate detection)
+  const rep3 = await prisma.waterloggingReport.create({
+    data: {
+      latitude: 19.0833,
+      longitude: 72.8876,
+      streetName: 'LBS Marg Bus Depot Entrance (Near Phoenix)',
+      landmark: 'BEST Bus Stop Shed',
+      city: 'Mumbai',
+      depthCategory: 'WAIST',
+      depthCm: 65.0,
+      waterLevelTrend: 'RISING',
+      roadCondition: 'DIFFICULT',
+      hazardTags: JSON.stringify(['DRAIN_OVERFLOW']),
+      description: 'Severe waterlogging outside depot entrance. Buses moving on high curbs.',
+      upvotes: 4,
+      status: 'UNVERIFIED',
+      priorityScore: 78.0,
+      isDuplicate: true,
+      parentReportId: rep2.id,
+      hotspotId: hotspotKurla.id,
+      reportedBy: 'Kishore Patil (Bus Driver)',
+      createdAt: new Date(Date.now() - 15 * 60 * 1000),
+      actions: {
+        create: [
+          {
+            actionType: 'MERGE_DUPLICATE_CANDIDATE',
+            actorName: 'FloodWatch Spatial Engine',
+            notes: `Flagged as potential duplicate (approx 110m from report #${rep2.id}).`,
+            createdAt: new Date(Date.now() - 15 * 60 * 1000),
+          },
+        ],
+      },
+    },
+  });
+
+  const rep4 = await prisma.waterloggingReport.create({
+    data: {
+      latitude: 19.0182,
+      longitude: 72.8441,
+      streetName: 'Hindmata Cinema Flyover Underpass, Dadar',
+      landmark: 'Near Dr. Babasaheb Ambedkar Road junction',
+      city: 'Mumbai',
+      depthCategory: 'KNEE',
+      depthCm: 40.0,
+      waterLevelTrend: 'STABLE',
+      roadCondition: 'DIFFICULT',
+      hazardTags: JSON.stringify(['STAGNANT_WATER', 'HEAVY_SLUDGE']),
+      description: 'Knee-deep water on southbound carriageway. Heavy vehicles passing slowly, two-wheelers slipping.',
+      upvotes: 6,
+      status: 'VERIFIED',
+      priorityScore: 52.0,
+      isDuplicate: false,
+      reportedBy: 'Rohit Kadam (Local Resident)',
+      verifiedAt: new Date(Date.now() - 1 * 60 * 60 * 1000),
+      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+      actions: {
+        create: [
+          {
+            actionType: 'REPORT_CREATED',
+            actorName: 'Rohit Kadam',
+            notes: 'Citizen report logged with knee-deep water rating.',
+            createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+          },
+          {
+            actionType: 'VERIFY',
+            actorName: 'Traffic Police Patrol #12',
+            notes: 'Confirmed slow traffic, advisory broadcasted.',
+            createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000),
+          },
+        ],
+      },
+    },
+  });
+
+  // Stale report (>6 hours old, demonstrates staleness flagging)
+  const rep5 = await prisma.waterloggingReport.create({
+    data: {
+      latitude: 19.0863,
+      longitude: 72.8415,
+      streetName: 'Milan Subway, Santacruz West',
+      landmark: 'Pedestrian Footpath Corridor',
+      city: 'Mumbai',
+      depthCategory: 'ANKLE',
+      depthCm: 15.0,
+      waterLevelTrend: 'UNKNOWN',
+      roadCondition: 'PASSABLE',
+      hazardTags: JSON.stringify(['PUDDLES']),
+      description: 'Minor water accumulation along sidewalk. Subway motor pumps active.',
+      upvotes: 2,
+      status: 'STALE',
+      isStale: true,
+      priorityScore: 18.0,
+      isDuplicate: false,
+      reportedBy: 'Sneha Rao',
+      createdAt: new Date(Date.now() - 8 * 60 * 60 * 1000),
+      actions: {
+        create: [
+          {
+            actionType: 'REPORT_CREATED',
+            actorName: 'Sneha Rao',
+            notes: 'Report logged 8 hours ago.',
+            createdAt: new Date(Date.now() - 8 * 60 * 60 * 1000),
+          },
+          {
+            actionType: 'FLAG_STALE',
+            actorName: 'FloodWatch Engine',
+            notes: 'Report has exceeded 6 hours without corroboration or updates. Flagged as stale.',
+            createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+          },
+        ],
+      },
+    },
+  });
+
+  // Resolved report
+  const rep6 = await prisma.waterloggingReport.create({
+    data: {
+      latitude: 19.0298,
+      longitude: 72.8572,
+      streetName: 'Gandhi Market, King\'s Circle, Matunga',
+      landmark: 'Near Post Office',
+      city: 'Mumbai',
+      depthCategory: 'KNEE',
+      depthCm: 35.0,
+      waterLevelTrend: 'FALLING',
+      roadCondition: 'PASSABLE',
+      hazardTags: JSON.stringify(['WATER_RECEDING']),
+      description: 'Dewatering pumps successfully cleared lane. Road now fully passable for all vehicular traffic.',
+      upvotes: 11,
+      status: 'RESOLVED',
+      priorityScore: 24.0,
+      isDuplicate: false,
+      reportedBy: 'Kunal Deshmukh (Shop Owner)',
+      resolvedAt: new Date(Date.now() - 15 * 60 * 1000),
+      createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+      actions: {
+        create: [
+          {
+            actionType: 'RESOLVE',
+            actorName: 'BMC Ward F/North Operations',
+            notes: 'High-capacity 300 HP submersible pump drained water. Situation normalized.',
+            createdAt: new Date(Date.now() - 15 * 60 * 1000),
+          },
+        ],
+      },
+    },
+  });
+
+  console.log('✅ Seeded FloodWatch waterlogging reports and hotspots');
+  console.log('🎉 FloodWatch Master Database Seeding Completed Successfully!');
 }
 
 main()
